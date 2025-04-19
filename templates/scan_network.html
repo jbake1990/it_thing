@@ -1,0 +1,202 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>Scan Network</h2>
+    <a href="{{ url_for('customer_details', customer_id=customer_id) }}" class="btn btn-secondary">
+        <i class="fas fa-arrow-left me-2"></i>Back to Customer
+    </a>
+</div>
+
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Network Scan Results</h5>
+                    <div class="d-flex align-items-center">
+                        <select id="sortSelect" class="form-select me-2" style="width: auto;">
+                            <option value="ip">Sort by IP Address</option>
+                            <option value="hostname">Sort by Hostname</option>
+                            <option value="mac">Sort by MAC Address</option>
+                            <option value="interface">Sort by Interface</option>
+                        </select>
+                        <button id="sortDirection" class="btn btn-outline-secondary">
+                            <i class="fas fa-sort-amount-down"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <form method="POST" id="scanForm">
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle me-2"></i>This will scan your local network for active devices.
+                        </div>
+                        
+                        <div id="scanProgress" class="progress mb-3 d-none">
+                            <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                                 role="progressbar" style="width: 100%">
+                                <span class="progress-text">Scanning network...</span>
+                            </div>
+                        </div>
+                        
+                        <div class="mt-3">
+                            <button type="submit" class="btn btn-primary" id="scanButton">
+                                <i class="fas fa-search me-2"></i>Start Scan
+                            </button>
+                        </div>
+                    </form>
+
+                    <div id="results" class="mt-4">
+                        {% if devices %}
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>IP Address</th>
+                                        <th>Hostname</th>
+                                        <th>MAC Address</th>
+                                        <th>Interface</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="devicesList">
+                                    {% for device in devices %}
+                                    <tr>
+                                        <td>{{ device.ip_address }}</td>
+                                        <td>{{ device.hostname }}</td>
+                                        <td>{{ device.mac_address }}</td>
+                                        <td>{{ device.interface }}</td>
+                                        <td>
+                                            <button class="btn btn-sm btn-primary add-device" 
+                                                    data-device='{{ device|tojson }}'>
+                                                Add to Network Info
+                                            </button>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="mt-3">
+                            <form method="POST" action="{{ url_for('add_all_network_info', customer_id=customer_id) }}">
+                                {% for device in devices %}
+                                <input type="hidden" name="devices[]" value='{{ device|tojson }}'>
+                                {% endfor %}
+                                <button type="submit" class="btn btn-success">
+                                    <i class="fas fa-plus-circle me-2"></i>Add All Devices
+                                </button>
+                            </form>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    let isAscending = true;
+    const sortDirectionBtn = document.getElementById('sortDirection');
+    const sortSelect = document.getElementById('sortSelect');
+    const devicesList = document.getElementById('devicesList');
+    const scanForm = document.getElementById('scanForm');
+    const scanProgress = document.getElementById('scanProgress');
+    const scanButton = document.getElementById('scanButton');
+    const progressText = document.querySelector('.progress-text');
+    
+    // Function to sort devices
+    function sortDevices(criteria, ascending) {
+        const rows = Array.from(devicesList.getElementsByTagName('tr'));
+        
+        rows.sort((a, b) => {
+            let aValue = a.children[getColumnIndex(criteria)].textContent;
+            let bValue = b.children[getColumnIndex(criteria)].textContent;
+            
+            // Special handling for IP addresses
+            if (criteria === 'ip') {
+                aValue = aValue.split('.').map(num => num.padStart(3, '0')).join('.');
+                bValue = bValue.split('.').map(num => num.padStart(3, '0')).join('.');
+            }
+            
+            if (ascending) {
+                return aValue.localeCompare(bValue);
+            } else {
+                return bValue.localeCompare(aValue);
+            }
+        });
+        
+        // Clear and re-append sorted rows
+        while (devicesList.firstChild) {
+            devicesList.removeChild(devicesList.firstChild);
+        }
+        rows.forEach(row => devicesList.appendChild(row));
+    }
+    
+    // Get column index based on sort criteria
+    function getColumnIndex(criteria) {
+        const criteriaMap = {
+            'ip': 0,
+            'hostname': 1,
+            'mac': 2,
+            'interface': 3
+        };
+        return criteriaMap[criteria];
+    }
+    
+    // Event listener for sort direction button
+    sortDirectionBtn.addEventListener('click', function() {
+        isAscending = !isAscending;
+        this.innerHTML = isAscending ? 
+            '<i class="fas fa-sort-amount-down"></i>' : 
+            '<i class="fas fa-sort-amount-up"></i>';
+        sortDevices(sortSelect.value, isAscending);
+    });
+    
+    // Event listener for sort criteria select
+    sortSelect.addEventListener('change', function() {
+        sortDevices(this.value, isAscending);
+    });
+    
+    // Event listener for scan form submission
+    scanForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        // Show progress bar and disable scan button
+        scanProgress.classList.remove('d-none');
+        scanButton.disabled = true;
+        scanButton.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Scanning...';
+        
+        // Update progress text periodically
+        let dots = 0;
+        const progressInterval = setInterval(() => {
+            dots = (dots + 1) % 4;
+            progressText.textContent = 'Scanning network' + '.'.repeat(dots);
+        }, 500);
+        
+        // Submit the form
+        this.submit();
+    });
+    
+    // Event listeners for add device buttons
+    document.querySelectorAll('.add-device').forEach(button => {
+        button.addEventListener('click', function() {
+            const device = JSON.parse(this.dataset.device);
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = `/customer/{{ customer_id }}/add-all-network-info`;
+            
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'devices[]';
+            input.value = JSON.stringify(device);
+            
+            form.appendChild(input);
+            document.body.appendChild(form);
+            form.submit();
+        });
+    });
+});
+</script>
+{% endblock %} 

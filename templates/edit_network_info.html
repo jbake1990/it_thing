@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h3>Edit Network Information</h3>
+    </div>
+    <div class="card-body">
+        <form method="POST" action="{{ url_for('edit_network_info', customer_id=customer_id, network_id=network_info.id) }}">
+            <div class="mb-3">
+                <label for="device_name" class="form-label">Device Name</label>
+                <input type="text" class="form-control" id="device_name" name="device_name" value="{{ network_info.device_name }}" required>
+            </div>
+            <div class="mb-3">
+                <label for="ip_address" class="form-label">IP Address</label>
+                <input type="text" class="form-control" id="ip_address" name="ip_address" value="{{ network_info.ip_address }}" required>
+            </div>
+            <div class="mb-3">
+                <label for="subnet_mask" class="form-label">Subnet Mask</label>
+                <input type="text" class="form-control" id="subnet_mask" name="subnet_mask" value="{{ network_info.subnet_mask }}">
+            </div>
+            <div class="mb-3">
+                <label for="gateway" class="form-label">Gateway</label>
+                <input type="text" class="form-control" id="gateway" name="gateway" value="{{ network_info.gateway }}">
+            </div>
+            <div class="mb-3">
+                <label for="dns_servers" class="form-label">DNS Servers</label>
+                <input type="text" class="form-control" id="dns_servers" name="dns_servers" value="{{ network_info.dns_servers }}">
+            </div>
+            <div class="mb-3">
+                <label for="login" class="form-label">Login</label>
+                <input type="text" class="form-control" id="login" name="login" value="{{ network_info.login }}">
+            </div>
+            <div class="mb-3">
+                <label for="password" class="form-label">Password</label>
+                <div class="input-group">
+                    <input type="password" class="form-control" id="password" name="password" value="{{ network_info.password }}">
+                    <button class="btn btn-outline-secondary" type="button" onclick="togglePassword()">
+                        <i class="fas fa-eye"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="mb-3">
+                <label for="notes" class="form-label">Notes</label>
+                <textarea class="form-control" id="notes" name="notes" rows="3">{{ network_info.notes }}</textarea>
+            </div>
+            <div class="d-flex justify-content-between">
+                <a href="{{ url_for('customer_details', customer_id=customer_id) }}" class="btn btn-secondary">Cancel</a>
+                <button type="submit" class="btn btn-primary">Save Changes</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function togglePassword() {
+    const passwordInput = document.getElementById('password');
+    const icon = document.querySelector('.fa-eye');
+    
+    if (passwordInput.type === 'password') {
+        passwordInput.type = 'text';
+        icon.classList.remove('fa-eye');
+        icon.classList.add('fa-eye-slash');
+    } else {
+        passwordInput.type = 'password';
+        icon.classList.remove('fa-eye-slash');
+        icon.classList.add('fa-eye');
+    }
+}
+</script>
+{% endblock %} 
