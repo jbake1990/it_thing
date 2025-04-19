@@ -1,70 +1,117 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="card">
-    <div class="card-header">
-        <h3>Edit Network Information</h3>
-    </div>
-    <div class="card-body">
-        <form method="POST" action="{{ url_for('edit_network_info', customer_id=customer_id, network_id=network_info.id) }}">
-            <div class="mb-3">
-                <label for="device_name" class="form-label">Device Name</label>
-                <input type="text" class="form-control" id="device_name" name="device_name" value="{{ network_info.device_name }}" required>
+<div class="container mt-4">
+    <h2>Edit Network Information</h2>
+    <form method="POST">
+        <div class="mb-3">
+            <label for="device_name" class="form-label">Device Name</label>
+            <input type="text" class="form-control" id="device_name" name="device_name" value="{{ network_info.device_name }}" required>
+        </div>
+        <div class="mb-3">
+            <label for="ip_address" class="form-label">IP Address</label>
+            <input type="text" class="form-control" id="ip_address" name="ip_address" value="{{ network_info.ip_address }}" required>
+        </div>
+        <div class="mb-3">
+            <label for="subnet_mask" class="form-label">Subnet Mask</label>
+            <input type="text" class="form-control" id="subnet_mask" name="subnet_mask" value="{{ network_info.subnet_mask }}">
+        </div>
+        <div class="mb-3">
+            <label for="gateway" class="form-label">Gateway</label>
+            <input type="text" class="form-control" id="gateway" name="gateway" value="{{ network_info.gateway }}">
+        </div>
+        <div class="mb-3">
+            <label for="dns_servers" class="form-label">DNS Servers</label>
+            <input type="text" class="form-control" id="dns_servers" name="dns_servers" value="{{ network_info.dns_servers }}">
+        </div>
+        <div class="mb-3">
+            <label for="system_type" class="form-label">System</label>
+            <select class="form-select" id="system_type" name="system_type" onchange="toggleCCTVFields()">
+                <option value="Undefined" {% if network_info.system_type == 'Undefined' %}selected{% endif %}>Undefined</option>
+                <option value="Networking Hardware" {% if network_info.system_type == 'Networking Hardware' %}selected{% endif %}>Networking Hardware</option>
+                <option value="CCTV System" {% if network_info.system_type == 'CCTV System' %}selected{% endif %}>CCTV System</option>
+                <option value="Control4" {% if network_info.system_type == 'Control4' %}selected{% endif %}>Control4</option>
+                <option value="A/V Hardware" {% if network_info.system_type == 'A/V Hardware' %}selected{% endif %}>A/V Hardware</option>
+                <option value="Security" {% if network_info.system_type == 'Security' %}selected{% endif %}>Security</option>
+                <option value="Access Control" {% if network_info.system_type == 'Access Control' %}selected{% endif %}>Access Control</option>
+            </select>
+        </div>
+        
+        <!-- CCTV Type Dropdown (conditionally shown) -->
+        <div class="mb-3" id="cctv_type_div" style="display: {% if network_info.system_type == 'CCTV System' %}block{% else %}none{% endif %};">
+            <label for="cctv_type" class="form-label">CCTV Type</label>
+            <select class="form-select" id="cctv_type" name="cctv_type">
+                <option value="">Select Type</option>
+                <option value="NVR" {% if network_info.cctv_type == 'NVR' %}selected{% endif %}>NVR</option>
+                <option value="Camera" {% if network_info.cctv_type == 'Camera' %}selected{% endif %}>Camera</option>
+            </select>
+        </div>
+        
+        <!-- CCTV Manufacturer Dropdown (conditionally shown) -->
+        <div class="mb-3" id="cctv_manufacturer_div" style="display: {% if network_info.system_type == 'CCTV System' %}block{% else %}none{% endif %};">
+            <label for="cctv_manufacturer" class="form-label">Manufacturer</label>
+            <select class="form-select" id="cctv_manufacturer" name="cctv_manufacturer">
+                <option value="">Select Manufacturer</option>
+                <option value="GeoVision" {% if network_info.cctv_manufacturer == 'GeoVision' %}selected{% endif %}>GeoVision</option>
+                <option value="UniviewTec" {% if network_info.cctv_manufacturer == 'UniviewTec' %}selected{% endif %}>UniviewTec</option>
+                <option value="IC Realtime" {% if network_info.cctv_manufacturer == 'IC Realtime' %}selected{% endif %}>IC Realtime</option>
+                <option value="ClearView" {% if network_info.cctv_manufacturer == 'ClearView' %}selected{% endif %}>ClearView</option>
+                <option value="Other" {% if network_info.cctv_manufacturer == 'Other' %}selected{% endif %}>Other</option>
+            </select>
+        </div>
+        
+        <div class="mb-3">
+            <label for="login" class="form-label">Login</label>
+            <input type="text" class="form-control" id="login" name="login" value="{{ network_info.login }}">
+        </div>
+        <div class="mb-3">
+            <label for="password" class="form-label">Password</label>
+            <div class="input-group">
+                <input type="password" class="form-control" id="password" name="password" value="{{ network_info.password }}">
+                <button class="btn btn-outline-secondary" type="button" onclick="togglePassword()">Show</button>
             </div>
-            <div class="mb-3">
-                <label for="ip_address" class="form-label">IP Address</label>
-                <input type="text" class="form-control" id="ip_address" name="ip_address" value="{{ network_info.ip_address }}" required>
-            </div>
-            <div class="mb-3">
-                <label for="subnet_mask" class="form-label">Subnet Mask</label>
-                <input type="text" class="form-control" id="subnet_mask" name="subnet_mask" value="{{ network_info.subnet_mask }}">
-            </div>
-            <div class="mb-3">
-                <label for="gateway" class="form-label">Gateway</label>
-                <input type="text" class="form-control" id="gateway" name="gateway" value="{{ network_info.gateway }}">
-            </div>
-            <div class="mb-3">
-                <label for="dns_servers" class="form-label">DNS Servers</label>
-                <input type="text" class="form-control" id="dns_servers" name="dns_servers" value="{{ network_info.dns_servers }}">
-            </div>
-            <div class="mb-3">
-                <label for="login" class="form-label">Login</label>
-                <input type="text" class="form-control" id="login" name="login" value="{{ network_info.login }}">
-            </div>
-            <div class="mb-3">
-                <label for="password" class="form-label">Password</label>
-                <div class="input-group">
-                    <input type="password" class="form-control" id="password" name="password" value="{{ network_info.password }}">
-                    <button class="btn btn-outline-secondary" type="button" onclick="togglePassword()">
-                        <i class="fas fa-eye"></i>
-                    </button>
-                </div>
-            </div>
-            <div class="mb-3">
-                <label for="notes" class="form-label">Notes</label>
-                <textarea class="form-control" id="notes" name="notes" rows="3">{{ network_info.notes }}</textarea>
-            </div>
-            <div class="d-flex justify-content-between">
-                <a href="{{ url_for('customer_details', customer_id=customer_id) }}" class="btn btn-secondary">Cancel</a>
-                <button type="submit" class="btn btn-primary">Save Changes</button>
-            </div>
-        </form>
-    </div>
+        </div>
+        <div class="mb-3">
+            <label for="notes" class="form-label">Notes</label>
+            <textarea class="form-control" id="notes" name="notes" rows="3">{{ network_info.notes }}</textarea>
+        </div>
+        <div class="d-grid gap-2">
+            <button type="submit" class="btn btn-primary">Save Changes</button>
+            <a href="{{ url_for('customer_details', customer_id=customer.id) }}" class="btn btn-outline-secondary">Cancel</a>
+            {% if network_info.system_type == 'CCTV System' %}
+                <a href="{{ url_for('add_cctv_user', customer_id=customer.id, network_id=network_info.id) }}" class="btn btn-success">
+                    <i class="fas fa-user-plus me-2"></i>Add User
+                </a>
+            {% endif %}
+        </div>
+    </form>
 </div>
 
 <script>
 function togglePassword() {
     const passwordInput = document.getElementById('password');
-    const icon = document.querySelector('.fa-eye');
+    const button = document.querySelector('button[onclick="togglePassword()"]');
     
     if (passwordInput.type === 'password') {
         passwordInput.type = 'text';
-        icon.classList.remove('fa-eye');
-        icon.classList.add('fa-eye-slash');
+        button.textContent = 'Hide';
     } else {
         passwordInput.type = 'password';
-        icon.classList.remove('fa-eye-slash');
-        icon.classList.add('fa-eye');
+        button.textContent = 'Show';
+    }
+}
+
+function toggleCCTVFields() {
+    const systemType = document.getElementById('system_type').value;
+    const cctvTypeDiv = document.getElementById('cctv_type_div');
+    const cctvManufacturerDiv = document.getElementById('cctv_manufacturer_div');
+    
+    if (systemType === 'CCTV System') {
+        cctvTypeDiv.style.display = 'block';
+        cctvManufacturerDiv.style.display = 'block';
+    } else {
+        cctvTypeDiv.style.display = 'none';
+        cctvManufacturerDiv.style.display = 'none';
     }
 }
 </script>

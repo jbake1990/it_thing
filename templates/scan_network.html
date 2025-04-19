@@ -78,9 +78,9 @@
                             </table>
                         </div>
                         <div class="mt-3">
-                            <form method="POST" action="{{ url_for('add_all_network_info', customer_id=customer_id) }}">
+                            <form method="POST" action="{{ url_for('add_all_network_info', customer_id=customer_id) }}" id="addAllForm">
                                 {% for device in devices %}
-                                <input type="hidden" name="devices[]" value='{{ device|tojson }}'>
+                                <input type="hidden" name="devices[]" value='{{ device|tojson|safe }}'>
                                 {% endfor %}
                                 <button type="submit" class="btn btn-success">
                                     <i class="fas fa-plus-circle me-2"></i>Add All Devices
@@ -185,7 +185,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const device = JSON.parse(this.dataset.device);
             const form = document.createElement('form');
             form.method = 'POST';
-            form.action = `/customer/{{ customer_id }}/add-all-network-info`;
+            form.action = "{{ url_for('add_all_network_info', customer_id=customer_id) }}";
             
             const input = document.createElement('input');
             input.type = 'hidden';

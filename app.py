@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, abort
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -6,11 +6,13 @@ from datetime import datetime
 import os
 from network_scanner import scan_network
 import json
+from flask_migrate import Migrate
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.urandom(24)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///it_management.db'
 db = SQLAlchemy(app)
+migrate = Migrate(app, db)
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
@@ -32,12 +34,13 @@ class Customer(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     network_info = db.relationship('NetworkInfo', backref='customer', lazy=True)
     credentials = db.relationship('Credential', backref='customer', lazy=True)
+    cctv_users = db.relationship('CCTVUser', backref='customer', lazy=True)
 
 class NetworkInfo(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     customer_id = db.Column(db.Integer, db.ForeignKey('customer.id'), nullable=False)
-    device_name = db.Column(db.String(100))
-    ip_address = db.Column(db.String(15))
+    device_name = db.Column(db.String(100), nullable=False)
+    ip_address = db.Column(db.String(15), nullable=False)
     subnet_mask = db.Column(db.String(15))
     gateway = db.Column(db.String(15))
     dns_servers = db.Column(db.String(200))
@@ -45,6 +48,9 @@ class NetworkInfo(db.Model):
     mac_address = db.Column(db.String(17))
     login = db.Column(db.String(100))
     password = db.Column(db.String(100))
+    system_type = db.Column(db.String(50))
+    cctv_type = db.Column(db.String(50))
+    cctv_manufacturer = db.Column(db.String(100))
 
 class Credential(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -54,9 +60,16 @@ class Credential(db.Model):
     password = db.Column(db.String(200))  # Will be encrypted in production
     notes = db.Column(db.Text)
 
+class CCTVUser(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    customer_id = db.Column(db.Integer, db.ForeignKey('customer.id'), nullable=False)
+    username = db.Column(db.String(100), nullable=False)
+    password = db.Column(db.String(100), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
 @login_manager.user_loader
 def load_user(user_id):
-    return User.query.get(int(user_id))
+    return db.session.get(User, int(user_id))
 
 # Routes
 @app.route('/')
@@ -74,6 +87,9 @@ def login():
         
         if user and check_password_hash(user.password_hash, password):
             login_user(user)
+            next_page = request.args.get('next')
+            if next_page:
+                return redirect(next_page)
             return redirect(url_for('index'))
         flash('Invalid username or password')
     return render_template('login.html')
@@ -105,7 +121,15 @@ def add_customer():
 @login_required
 def customer_details(customer_id):
     customer = Customer.query.get_or_404(customer_id)
-    return render_template('customer_details.html', customer=customer)
+    check_access(customer)
+    
+    # Get CCTV devices
+    cctv_devices = [device for device in customer.network_info if device.system_type == 'CCTV System']
+    
+    # Get all CCTV users for this customer
+    cctv_users = CCTVUser.query.filter_by(customer_id=customer_id).all()
+    
+    return render_template('customer_details.html', customer=customer, cctv_devices=cctv_devices, cctv_users=cctv_users)
 
 @app.route('/customer/<int:customer_id>/network/add', methods=['GET', 'POST'])
 @login_required
@@ -153,56 +177,99 @@ def scan_network_route(customer_id):
             
             if not devices:
                 flash('No devices found on the network.', 'warning')
-                return redirect(url_for('scan_network', customer_id=customer_id))
+                return redirect(url_for('scan_network_route', customer_id=customer_id))
+            
+            # Format devices for display
+            formatted_devices = []
+            for device in devices:
+                formatted_device = {
+                    'ip_address': device['ip_address'],
+                    'hostname': device.get('hostname', 'Unknown'),
+                    'mac_address': device.get('mac_address', 'Unknown'),
+                    'interface': device.get('interface', 'Unknown')
+                }
+                formatted_devices.append(formatted_device)
             
             # Sort devices by IP address
-            devices.sort(key=lambda x: [int(i) for i in x['ip_address'].split('.')])
+            formatted_devices.sort(key=lambda x: [int(i) for i in x['ip_address'].split('.')])
             
             return render_template('scan_network.html', 
                                 customer_id=customer_id,
-                                devices=devices)
+                                devices=formatted_devices)
         except Exception as e:
             flash(f'Error scanning network: {str(e)}', 'danger')
-            return redirect(url_for('scan_network', customer_id=customer_id))
+            return redirect(url_for('scan_network_route', customer_id=customer_id))
     
     return render_template('scan_network.html', customer_id=customer_id)
 
-@app.route('/customer/<int:customer_id>/add-all-network-info', methods=['POST'])
+def check_access(customer):
+    """Check if the current user has access to the customer's data."""
+    if current_user.is_admin:
+        return True
+    # Add additional access control logic here if needed
+    return True
+
+@app.route('/customer/<int:customer_id>/add_all_network_info', methods=['POST'])
 @login_required
 def add_all_network_info(customer_id):
     customer = Customer.query.get_or_404(customer_id)
     
+    if not check_access(customer):
+        flash('You do not have permission to access this customer.', 'error')
+        return redirect(url_for('index'))
+    
     try:
-        # Get the devices from the form
         devices = request.form.getlist('devices[]')
         added_count = 0
+        skipped_count = 0
         
         for device_json in devices:
-            device = json.loads(device_json)
-            
-            # Check if this device already exists
-            existing = NetworkInfo.query.filter_by(
-                customer_id=customer_id,
-                ip_address=device['ip_address']
-            ).first()
-            
-            if not existing:
+            try:
+                device = json.loads(device_json)
+                
+                # Check if device already exists
+                existing_device = NetworkInfo.query.filter_by(
+                    customer_id=customer_id,
+                    ip_address=device.get('ip_address')
+                ).first()
+                
+                if existing_device:
+                    app.logger.info(f"Skipping existing device: {device.get('ip_address')}")
+                    skipped_count += 1
+                    continue
+                
                 # Create new network info entry
                 network_info = NetworkInfo(
                     customer_id=customer_id,
-                    device_name=device['hostname'] or f"Device {device['ip_address']}",
-                    ip_address=device['ip_address'],
-                    mac_address=device['mac_address'],
-                    notes=""  # Leave notes blank by default
+                    device_name=device.get('hostname', 'Unknown Device'),
+                    ip_address=device.get('ip_address'),
+                    mac_address=device.get('mac_address'),
+                    system_type='Undefined'  # Default system type
                 )
+                
                 db.session.add(network_info)
                 added_count += 1
+                
+            except json.JSONDecodeError as e:
+                app.logger.error(f"Error parsing device data: {e}")
+                continue
+            except Exception as e:
+                app.logger.error(f"Error processing device: {e}")
+                continue
         
         db.session.commit()
-        flash(f'Successfully added {added_count} devices to network information.', 'success')
+        
+        if added_count > 0:
+            flash(f'Successfully added {added_count} new devices.', 'success')
+        if skipped_count > 0:
+            flash(f'Skipped {skipped_count} existing devices.', 'info')
+        if added_count == 0 and skipped_count == 0:
+            flash('No new devices were added.', 'info')
+            
     except Exception as e:
         db.session.rollback()
-        flash(f'Error adding devices: {str(e)}', 'error')
+        app.logger.error(f"Error adding network info: {e}")
+        flash('An error occurred while adding devices.', 'error')
     
     return redirect(url_for('customer_details', customer_id=customer_id))
 
@@ -227,6 +294,16 @@ def edit_network_info(customer_id, network_id):
             network_info.notes = request.form.get('notes')
             network_info.login = request.form.get('login')
             network_info.password = request.form.get('password')
+            network_info.system_type = request.form.get('system_type', 'Undefined')
+            
+            # Handle CCTV specific fields
+            if network_info.system_type == 'CCTV System':
+                network_info.cctv_type = request.form.get('cctv_type')
+                network_info.cctv_manufacturer = request.form.get('cctv_manufacturer')
+            else:
+                # Clear CCTV fields if system type is not CCTV
+                network_info.cctv_type = None
+                network_info.cctv_manufacturer = None
             
             db.session.commit()
             flash('Network information updated successfully!', 'success')
@@ -236,6 +313,7 @@ def edit_network_info(customer_id, network_id):
             flash(f'Error updating network information: {str(e)}', 'error')
     
     return render_template('edit_network_info.html', 
+                         customer=customer,
                          customer_id=customer_id, 
                          network_info=network_info)
 
@@ -384,6 +462,74 @@ def edit_customer(customer_id):
     
     return render_template('edit_customer.html', customer=customer)
 
+@app.route('/customer/<int:customer_id>/cctv/user/add', methods=['GET', 'POST'])
+@login_required
+def add_cctv_user(customer_id):
+    customer = Customer.query.get_or_404(customer_id)
+    check_access(customer)
+    
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+        
+        if not username or not password:
+            flash('Username and password are required', 'danger')
+            return redirect(url_for('add_cctv_user', customer_id=customer_id))
+        
+        user = CCTVUser(
+            customer_id=customer_id,
+            username=username,
+            password=password
+        )
+        
+        db.session.add(user)
+        db.session.commit()
+        
+        flash('CCTV user added successfully', 'success')
+        return redirect(url_for('customer_details', customer_id=customer_id))
+    
+    return render_template('add_cctv_user.html', customer=customer)
+
+@app.route('/customer/<int:customer_id>/cctv/user/<int:user_id>/edit', methods=['GET', 'POST'])
+@login_required
+def edit_cctv_user(customer_id, user_id):
+    customer = Customer.query.get_or_404(customer_id)
+    check_access(customer)
+    
+    user = CCTVUser.query.filter_by(id=user_id, customer_id=customer_id).first_or_404()
+    
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+        
+        if not username or not password:
+            flash('Username and password are required', 'danger')
+            return redirect(url_for('edit_cctv_user', customer_id=customer_id, user_id=user_id))
+        
+        user.username = username
+        user.password = password
+        
+        db.session.commit()
+        
+        flash('CCTV user updated successfully', 'success')
+        return redirect(url_for('customer_details', customer_id=customer_id))
+    
+    return render_template('edit_cctv_user.html', customer=customer, user=user)
+
+@app.route('/customer/<int:customer_id>/cctv/user/<int:user_id>/delete', methods=['POST'])
+@login_required
+def delete_cctv_user(customer_id, user_id):
+    customer = Customer.query.get_or_404(customer_id)
+    check_access(customer)
+    
+    user = CCTVUser.query.filter_by(id=user_id, customer_id=customer_id).first_or_404()
+    
+    db.session.delete(user)
+    db.session.commit()
+    
+    flash('CCTV user deleted successfully', 'success')
+    return redirect(url_for('customer_details', customer_id=customer_id))
+
 def scan_network(ip_range=None, ports=None):
     """
     Scan the network for devices.
@@ -518,4 +664,4 @@ def scan_network(ip_range=None, ports=None):
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
-    app.run(debug=True) 
+    app.run(debug=True, port=8080) 
