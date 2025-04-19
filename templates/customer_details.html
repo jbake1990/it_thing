@@ -231,9 +231,9 @@
         <div class="tab-pane fade" id="credentials" role="tabpanel">
             <div class="card">
                 <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5 class="card-title mb-0">Credentials</h5>
+                    <h5 class="card-title mb-0">Passwords</h5>
                     <a href="{{ url_for('add_credential', customer_id=customer.id) }}" class="btn btn-primary">
-                        <i class="fas fa-plus me-2"></i>Add Credential
+                        <i class="fas fa-plus me-2"></i>Add Password
                     </a>
                 </div>
                 <div class="card-body">
@@ -283,7 +283,7 @@
                         </table>
                     </div>
                     {% else %}
-                    <p class="text-muted">No credentials available.</p>
+                    <p class="text-muted">No passwords available.</p>
                     {% endif %}
                 </div>
             </div>
