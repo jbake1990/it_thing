@@ -30,9 +30,36 @@
                         <input type="email" class="form-control" id="email" name="email" value="{{ customer.email }}">
                     </div>
                     <div class="d-flex justify-content-between">
-                        <a href="{{ url_for('customer_details', customer_id=customer.id) }}" class="btn btn-secondary">Cancel</a>
+                        <div>
+                            <a href="{{ url_for('customer_details', customer_id=customer.id) }}" class="btn btn-secondary">Cancel</a>
+                            <button type="button" class="btn btn-danger ms-2" data-bs-toggle="modal" data-bs-target="#deleteModal">
+                                Delete Customer
+                            </button>
+                        </div>
                         <button type="submit" class="btn btn-primary">Save Changes</button>
                     </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="deleteModalLabel">Confirm Deletion</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete the customer <strong>{{ customer.name }}</strong>?</p>
+                <p class="text-danger">This action cannot be undone. All associated data including network devices, credentials, and CCTV users will be permanently deleted.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <form action="{{ url_for('delete_customer', customer_id=customer.id) }}" method="POST" class="d-inline">
+                    <button type="submit" class="btn btn-danger">Delete Customer</button>
                 </form>
             </div>
         </div>

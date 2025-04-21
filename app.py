@@ -163,7 +163,7 @@ def add_credential(customer_id):
         )
         db.session.add(credential)
         db.session.commit()
-        flash('Credential added successfully')
+        flash('Password added successfully')
         return redirect(url_for('customer_details', customer_id=customer_id))
     return render_template('add_credential.html', customer_id=customer_id)
 
@@ -444,23 +444,47 @@ def scan_network_path_params(ip_range, ports):
 @login_required
 def edit_customer(customer_id):
     customer = Customer.query.get_or_404(customer_id)
+    check_access(customer)
     
     if request.method == 'POST':
-        try:
-            customer.name = request.form.get('name')
-            customer.address = request.form.get('address')
-            customer.contact_person = request.form.get('contact_person')
-            customer.phone = request.form.get('phone')
-            customer.email = request.form.get('email')
-            
-            db.session.commit()
-            flash('Customer information updated successfully!', 'success')
-            return redirect(url_for('customer_details', customer_id=customer_id))
-        except Exception as e:
-            db.session.rollback()
-            flash(f'Error updating customer information: {str(e)}', 'error')
+        customer.name = request.form.get('name')
+        customer.address = request.form.get('address')
+        customer.contact_person = request.form.get('contact_person')
+        customer.phone = request.form.get('phone')
+        customer.email = request.form.get('email')
+        
+        db.session.commit()
+        flash('Customer updated successfully')
+        return redirect(url_for('customer_details', customer_id=customer_id))
     
     return render_template('edit_customer.html', customer=customer)
+
+@app.route('/customer/<int:customer_id>/delete', methods=['POST'])
+@login_required
+def delete_customer(customer_id):
+    customer = Customer.query.get_or_404(customer_id)
+    check_access(customer)
+    
+    try:
+        # Delete all associated CCTV users first
+        CCTVUser.query.filter_by(customer_id=customer_id).delete()
+        
+        # Delete all associated credentials
+        Credential.query.filter_by(customer_id=customer_id).delete()
+        
+        # Delete all associated network info
+        NetworkInfo.query.filter_by(customer_id=customer_id).delete()
+        
+        # Now delete the customer
+        db.session.delete(customer)
+        db.session.commit()
+        
+        flash('Customer and all associated data have been deleted successfully')
+        return redirect(url_for('index'))
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error deleting customer: {str(e)}', 'error')
+        return redirect(url_for('customer_details', customer_id=customer_id))
 
 @app.route('/customer/<int:customer_id>/cctv/user/add', methods=['GET', 'POST'])
 @login_required
@@ -528,6 +552,34 @@ def delete_cctv_user(customer_id, user_id):
     db.session.commit()
     
     flash('CCTV user deleted successfully', 'success')
+    return redirect(url_for('customer_details', customer_id=customer_id))
+
+@app.route('/customer/<int:customer_id>/credential/<int:credential_id>/edit', methods=['GET', 'POST'])
+@login_required
+def edit_credential(customer_id, credential_id):
+    credential = Credential.query.filter_by(id=credential_id, customer_id=customer_id).first_or_404()
+    
+    if request.method == 'POST':
+        credential.service_name = request.form.get('service_name')
+        credential.username = request.form.get('username')
+        credential.password = request.form.get('password')
+        credential.notes = request.form.get('notes')
+        
+        db.session.commit()
+        flash('Password updated successfully')
+        return redirect(url_for('customer_details', customer_id=customer_id))
+    
+    return render_template('edit_credential.html', customer_id=customer_id, credential=credential)
+
+@app.route('/customer/<int:customer_id>/credential/<int:credential_id>/delete', methods=['POST'])
+@login_required
+def delete_credential(customer_id, credential_id):
+    credential = Credential.query.filter_by(id=credential_id, customer_id=customer_id).first_or_404()
+    
+    db.session.delete(credential)
+    db.session.commit()
+    
+    flash('Password deleted successfully')
     return redirect(url_for('customer_details', customer_id=customer_id))
 
 def scan_network(ip_range=None, ports=None):

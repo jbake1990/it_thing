@@ -64,7 +64,7 @@
             <div class="d-flex justify-content-between align-items-center mb-3">
                 <h3>Network Information</h3>
                 <div>
-                    <a href="{{ url_for('scan_network_route', customer_id=customer.id) }}" class="btn btn-primary me-2">Scan Network</a>
+                    <button type="button" class="btn btn-primary me-2" data-bs-toggle="modal" data-bs-target="#scanNetworkModal">Scan Network</button>
                     <a href="{{ url_for('add_network_info', customer_id=customer.id) }}" class="btn btn-success">Add Network Info</a>
                 </div>
             </div>
@@ -286,6 +286,26 @@
                     <p class="text-muted">No passwords available.</p>
                     {% endif %}
                 </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Scan Network Warning Modal -->
+<div class="modal fade" id="scanNetworkModal" tabindex="-1" aria-labelledby="scanNetworkModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="scanNetworkModalLabel">Warning</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-danger"><strong>This feature is for on-site use ONLY.</strong></p>
+                <p>Are you sure you want to proceed with the network scan?</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Go Back</button>
+                <a href="{{ url_for('scan_network_route', customer_id=customer.id) }}" class="btn btn-primary">Proceed</a>
             </div>
         </div>
     </div>
