@@ -10,6 +10,7 @@ import json
 from flask_migrate import Migrate, upgrade
 from urllib.parse import urlparse
 from sqlalchemy import text, inspect
+from functools import wraps
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -780,7 +781,71 @@ def health_check():
             'error': str(e)
         }), 500
 
+def require_debug_token(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        debug_token = os.environ.get('DEBUG_TOKEN')
+        if not debug_token or request.args.get('token') != debug_token:
+            return jsonify({
+                'status': 'error',
+                'message': 'Unauthorized'
+            }), 401
+        return f(*args, **kwargs)
+    return decorated_function
+
+@app.route('/verify-db', methods=['GET'])
+@require_debug_token
+def verify_db():
+    try:
+        # Test database connection
+        db.session.execute(text('SELECT 1'))
+        
+        # Check if User table exists and has correct structure
+        inspector = inspect(db.engine)
+        columns = inspector.get_columns('user')
+        
+        column_info = {}
+        for col in columns:
+            column_info[col['name']] = {
+                'type': str(col['type']),
+                'nullable': col.get('nullable', True)
+            }
+        
+        return jsonify({
+            'status': 'success',
+            'message': 'Database connection successful',
+            'table_structure': {
+                'user': column_info
+            }
+        })
+    except Exception as e:
+        logger.error(f"Database verification error: {str(e)}")
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
+@app.route('/run-migrations', methods=['GET'])
+@require_debug_token
+def run_migrations():
+    try:
+        logger.info("Running database migrations...")
+        upgrade()
+        logger.info("Migrations completed successfully")
+        
+        return jsonify({
+            'status': 'success',
+            'message': 'Database migrations completed successfully'
+        })
+    except Exception as e:
+        logger.error(f"Migration error: {str(e)}")
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
 @app.route('/setup-admin', methods=['GET'])
+@require_debug_token
 def setup_admin():
     try:
         logger.info("Attempting to create admin user...")
@@ -838,6 +903,7 @@ def setup_admin():
         }), 500
 
 @app.route('/debug-admin', methods=['GET'])
+@require_debug_token
 def debug_admin():
     try:
         admin = User.query.filter_by(username='admin').first()
@@ -859,55 +925,6 @@ def debug_admin():
             })
     except Exception as e:
         logger.error(f"Debug error: {str(e)}")
-        return jsonify({
-            'status': 'error',
-            'message': str(e)
-        }), 500
-
-@app.route('/verify-db', methods=['GET'])
-def verify_db():
-    try:
-        # Test database connection
-        db.session.execute(text('SELECT 1'))
-        
-        # Check if User table exists and has correct structure
-        inspector = inspect(db.engine)
-        columns = inspector.get_columns('user')
-        
-        column_info = {}
-        for col in columns:
-            column_info[col['name']] = {
-                'type': str(col['type']),
-                'nullable': col.get('nullable', True)
-            }
-        
-        return jsonify({
-            'status': 'success',
-            'message': 'Database connection successful',
-            'table_structure': {
-                'user': column_info
-            }
-        })
-    except Exception as e:
-        logger.error(f"Database verification error: {str(e)}")
-        return jsonify({
-            'status': 'error',
-            'message': str(e)
-        }), 500
-
-@app.route('/run-migrations', methods=['GET'])
-def run_migrations():
-    try:
-        logger.info("Running database migrations...")
-        upgrade()
-        logger.info("Migrations completed successfully")
-        
-        return jsonify({
-            'status': 'success',
-            'message': 'Database migrations completed successfully'
-        })
-    except Exception as e:
-        logger.error(f"Migration error: {str(e)}")
         return jsonify({
             'status': 'error',
             'message': str(e)
