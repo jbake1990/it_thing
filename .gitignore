@@ -23,4 +23,6 @@ backups/
 .vscode/
 .idea/
 *.swp
-*.swo 
+*.swo __pycache__/
+.DS_Store
+instance/

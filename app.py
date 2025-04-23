@@ -223,17 +223,16 @@ def add_credential(customer_id):
 def scan_network_route(customer_id):
     if request.method == 'POST':
         try:
-            # Use the original network_scanner.py implementation
-            from network_scanner import scan_network
-            devices = scan_network()
-            
+            # Get devices from form data
+            devices = request.form.getlist('devices[]')
             if not devices:
                 flash('No devices found on the network.', 'warning')
                 return redirect(url_for('scan_network_route', customer_id=customer_id))
             
-            # Format devices for display
+            # Parse devices from JSON
             formatted_devices = []
-            for device in devices:
+            for device_json in devices:
+                device = json.loads(device_json)
                 formatted_device = {
                     'ip_address': device['ip_address'],
                     'hostname': device.get('hostname', 'Unknown'),
@@ -249,7 +248,7 @@ def scan_network_route(customer_id):
                                 customer_id=customer_id,
                                 devices=formatted_devices)
         except Exception as e:
-            flash(f'Error scanning network: {str(e)}', 'danger')
+            flash(f'Error processing network scan results: {str(e)}', 'danger')
             return redirect(url_for('scan_network_route', customer_id=customer_id))
     
     return render_template('scan_network.html', customer_id=customer_id)
