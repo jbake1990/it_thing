@@ -19,27 +19,63 @@ class NetworkScanner {
         this.devices = [];
 
         try {
+            console.log('Starting network scan...');
+            console.log('IP Range provided:', ipRange);
+
             // If no IP range provided, try to detect local network
             if (!ipRange) {
+                console.log('No IP range provided, attempting to detect local network...');
                 ipRange = await this.detectLocalNetwork();
+            }
+
+            // Validate IP range format
+            if (!this.isValidIpRange(ipRange)) {
+                throw new Error('Invalid IP range format. Please use CIDR notation (e.g., 192.168.1.0/24)');
             }
 
             // Parse IP range
             const [baseIp, cidr] = ipRange.split('/');
+            console.log('Base IP:', baseIp);
+            console.log('CIDR:', cidr);
+
             const subnetMask = this.cidrToSubnetMask(parseInt(cidr));
             const startIp = this.getNetworkAddress(baseIp, subnetMask);
             const endIp = this.getBroadcastAddress(baseIp, subnetMask);
 
+            console.log('Subnet Mask:', subnetMask);
+            console.log('Start IP:', startIp);
+            console.log('End IP:', endIp);
+
             // Scan IP range
             await this.scanIpRange(startIp, endIp);
 
+            console.log('Scan completed. Found devices:', this.devices.length);
             return this.devices;
+        } catch (error) {
+            console.error('Error during network scan:', error);
+            throw error;
         } finally {
             this.scanning = false;
         }
     }
 
+    isValidIpRange(ipRange) {
+        const cidrRegex = /^([0-9]{1,3}\.){3}[0-9]{1,3}\/([0-9]|[1-2][0-9]|3[0-2])$/;
+        if (!cidrRegex.test(ipRange)) {
+            return false;
+        }
+
+        const [ip, cidr] = ipRange.split('/');
+        const parts = ip.split('.');
+        
+        return parts.every(part => {
+            const num = parseInt(part);
+            return num >= 0 && num <= 255;
+        });
+    }
+
     async detectLocalNetwork() {
+        console.log('Attempting to detect local network...');
         // Try multiple methods to detect local network
         const methods = [
             this.getLocalIpWebRTC.bind(this),
@@ -49,6 +85,7 @@ class NetworkScanner {
 
         for (const method of methods) {
             try {
+                console.log(`Trying ${method.name}...`);
                 const ip = await method();
                 if (ip) {
                     console.log(`Detected local IP using ${method.name}: ${ip}`);
@@ -166,10 +203,13 @@ class NetworkScanner {
     }
 
     async scanIpRange(startIp, endIp) {
+        console.log('Starting IP range scan...');
         const startParts = startIp.split('.').map(Number);
         const endParts = endIp.split('.').map(Number);
         const totalIps = this.calculateTotalIps(startParts, endParts);
         let scannedIps = 0;
+
+        console.log('Total IPs to scan:', totalIps);
 
         // Create an array of IPs to scan
         const ipsToScan = [];
@@ -184,14 +224,19 @@ class NetworkScanner {
             }
         }
 
+        console.log('IPs to scan:', ipsToScan.length);
+
         // Scan IPs in batches to avoid overwhelming the browser
         const batchSize = 10;
         for (let i = 0; i < ipsToScan.length; i += batchSize) {
             const batch = ipsToScan.slice(i, i + batchSize);
+            console.log(`Scanning batch ${i/batchSize + 1}/${Math.ceil(ipsToScan.length/batchSize)}`);
+            
             await Promise.all(batch.map(async (ip) => {
                 try {
                     const device = await this.scanIp(ip);
                     if (device) {
+                        console.log('Found device:', device);
                         this.devices.push(device);
                     }
                 } catch (error) {
@@ -216,6 +261,7 @@ class NetworkScanner {
         return new Promise((resolve) => {
             const img = new Image();
             img.onload = () => {
+                console.log(`Device found at ${ip}`);
                 resolve({
                     ip_address: ip,
                     hostname: 'Unknown',
