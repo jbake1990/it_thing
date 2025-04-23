@@ -40,17 +40,29 @@ class NetworkScanner {
     }
 
     async detectLocalNetwork() {
-        // Get local IP using WebRTC
-        const localIp = await this.getLocalIp();
-        if (!localIp) {
-            throw new Error('Could not detect local IP address');
+        // Try multiple methods to detect local network
+        const methods = [
+            this.getLocalIpWebRTC.bind(this),
+            this.getLocalIpWebSocket.bind(this),
+            this.getLocalIpDefault.bind(this)
+        ];
+
+        for (const method of methods) {
+            try {
+                const ip = await method();
+                if (ip) {
+                    console.log(`Detected local IP using ${method.name}: ${ip}`);
+                    return `${ip}/24`; // Assume /24 subnet for local networks
+                }
+            } catch (error) {
+                console.warn(`Method ${method.name} failed:`, error);
+            }
         }
 
-        // Assume /24 subnet for local networks
-        return `${localIp}/24`;
+        throw new Error('Could not detect local network. Please specify an IP range manually.');
     }
 
-    async getLocalIp() {
+    async getLocalIpWebRTC() {
         return new Promise((resolve) => {
             const pc = new RTCPeerConnection({
                 iceServers: []
@@ -75,6 +87,59 @@ class NetworkScanner {
                     resolve(match[1]);
                 }
             };
+        });
+    }
+
+    async getLocalIpWebSocket() {
+        return new Promise((resolve) => {
+            const ws = new WebSocket('ws://localhost:8080');
+            ws.onopen = () => {
+                const ip = ws._socket.remoteAddress;
+                ws.close();
+                resolve(ip);
+            };
+            ws.onerror = () => {
+                resolve(null);
+            };
+        });
+    }
+
+    getLocalIpDefault() {
+        // Return common local network ranges
+        const commonRanges = [
+            '192.168.1.1',
+            '192.168.0.1',
+            '10.0.0.1',
+            '172.16.0.1'
+        ];
+
+        // Try to determine which range is most likely
+        return new Promise((resolve) => {
+            let foundIp = null;
+            let remainingChecks = commonRanges.length;
+
+            commonRanges.forEach(ip => {
+                const img = new Image();
+                img.onload = () => {
+                    if (!foundIp) {
+                        foundIp = ip;
+                    }
+                    remainingChecks--;
+                    if (remainingChecks === 0) {
+                        resolve(foundIp);
+                    }
+                };
+                img.onerror = () => {
+                    remainingChecks--;
+                    if (remainingChecks === 0) {
+                        resolve(foundIp);
+                    }
+                };
+                img.src = `http://${ip}/favicon.ico?${Date.now()}`;
+                setTimeout(() => {
+                    img.src = '';
+                }, 100);
+            });
         });
     }
 
@@ -106,31 +171,37 @@ class NetworkScanner {
         const totalIps = this.calculateTotalIps(startParts, endParts);
         let scannedIps = 0;
 
+        // Create an array of IPs to scan
+        const ipsToScan = [];
         for (let a = startParts[0]; a <= endParts[0]; a++) {
             for (let b = startParts[1]; b <= endParts[1]; b++) {
                 for (let c = startParts[2]; c <= endParts[2]; c++) {
                     for (let d = startParts[3]; d <= endParts[3]; d++) {
-                        const ip = `${a}.${b}.${c}.${d}`;
-                        
-                        // Skip network and broadcast addresses
-                        if (d === 0 || d === 255) continue;
-
-                        try {
-                            const device = await this.scanIp(ip);
-                            if (device) {
-                                this.devices.push(device);
-                            }
-                        } catch (error) {
-                            console.error(`Error scanning ${ip}:`, error);
-                        }
-
-                        scannedIps++;
-                        if (this.progressCallback) {
-                            this.progressCallback((scannedIps / totalIps) * 100);
-                        }
+                        if (d === 0 || d === 255) continue; // Skip network and broadcast addresses
+                        ipsToScan.push(`${a}.${b}.${c}.${d}`);
                     }
                 }
             }
+        }
+
+        // Scan IPs in batches to avoid overwhelming the browser
+        const batchSize = 10;
+        for (let i = 0; i < ipsToScan.length; i += batchSize) {
+            const batch = ipsToScan.slice(i, i + batchSize);
+            await Promise.all(batch.map(async (ip) => {
+                try {
+                    const device = await this.scanIp(ip);
+                    if (device) {
+                        this.devices.push(device);
+                    }
+                } catch (error) {
+                    console.error(`Error scanning ${ip}:`, error);
+                }
+                scannedIps++;
+                if (this.progressCallback) {
+                    this.progressCallback((scannedIps / totalIps) * 100);
+                }
+            }));
         }
     }
 
