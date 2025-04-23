@@ -7,10 +7,22 @@ import os
 from network_scanner import scan_network
 import json
 from flask_migrate import Migrate
+from urllib.parse import urlparse
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', os.urandom(24))
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///it_management.db')
+
+# Database configuration
+database_url = os.environ.get('DATABASE_URL')
+if database_url:
+    # Parse the DATABASE_URL to ensure it's in the correct format
+    parsed = urlparse(database_url)
+    if parsed.scheme == 'postgres':
+        database_url = database_url.replace('postgres://', 'postgresql://', 1)
+    app.config['SQLALCHEMY_DATABASE_URI'] = database_url
+else:
+    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///it_management.db'
+
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
