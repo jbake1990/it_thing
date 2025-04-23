@@ -770,6 +770,40 @@ def health_check():
             'error': str(e)
         }), 500
 
+@app.route('/setup-admin', methods=['GET'])
+def setup_admin():
+    try:
+        # Check if admin user already exists
+        admin = User.query.filter_by(username='admin').first()
+        if not admin:
+            # Create new admin user
+            admin = User(
+                username='admin',
+                password_hash=generate_password_hash('admin123'),  # Change this password
+                is_admin=True
+            )
+            db.session.add(admin)
+            db.session.commit()
+            return jsonify({
+                'status': 'success',
+                'message': 'Admin user created successfully!',
+                'credentials': {
+                    'username': 'admin',
+                    'password': 'admin123'  # This is just for initial setup
+                }
+            })
+        else:
+            return jsonify({
+                'status': 'info',
+                'message': 'Admin user already exists.'
+            })
+    except Exception as e:
+        logger.error(f"Error creating admin user: {str(e)}")
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
