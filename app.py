@@ -124,14 +124,23 @@ def login():
     if request.method == 'POST':
         username = request.form.get('username')
         password = request.form.get('password')
-        user = User.query.filter_by(username=username).first()
+        logger.info(f"Login attempt for username: {username}")
         
-        if user and check_password_hash(user.password_hash, password):
-            login_user(user)
-            next_page = request.args.get('next')
-            if next_page:
-                return redirect(next_page)
-            return redirect(url_for('index'))
+        user = User.query.filter_by(username=username).first()
+        if user:
+            logger.info(f"User found: {user.username}")
+            if check_password_hash(user.password_hash, password):
+                logger.info("Password correct, logging in user")
+                login_user(user)
+                next_page = request.args.get('next')
+                if next_page:
+                    return redirect(next_page)
+                return redirect(url_for('index'))
+            else:
+                logger.warning("Invalid password")
+        else:
+            logger.warning(f"User not found: {username}")
+        
         flash('Invalid username or password')
     return render_template('login.html')
 
@@ -799,6 +808,33 @@ def setup_admin():
             })
     except Exception as e:
         logger.error(f"Error creating admin user: {str(e)}")
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
+@app.route('/debug-admin', methods=['GET'])
+def debug_admin():
+    try:
+        admin = User.query.filter_by(username='admin').first()
+        if admin:
+            return jsonify({
+                'status': 'success',
+                'admin_exists': True,
+                'admin_details': {
+                    'username': admin.username,
+                    'is_admin': admin.is_admin,
+                    'password_hash_length': len(admin.password_hash)
+                }
+            })
+        else:
+            return jsonify({
+                'status': 'success',
+                'admin_exists': False,
+                'message': 'Admin user not found'
+            })
+    except Exception as e:
+        logger.error(f"Debug error: {str(e)}")
         return jsonify({
             'status': 'error',
             'message': str(e)
