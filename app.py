@@ -9,13 +9,22 @@ import json
 from flask_migrate import Migrate
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = os.urandom(24)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///it_management.db'
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', os.urandom(24))
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///it_management.db')
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
+
+# Initialize database
+@app.before_first_request
+def create_tables():
+    try:
+        db.create_all()
+    except Exception as e:
+        print(f"Error creating database tables: {e}")
 
 # Database Models
 class User(UserMixin, db.Model):
