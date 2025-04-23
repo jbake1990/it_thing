@@ -755,6 +755,22 @@ def scan_network(ip_range=None, ports=None):
     
     return devices
 
+@app.route('/health')
+def health_check():
+    try:
+        # Test database connection
+        db.session.execute('SELECT 1')
+        return jsonify({
+            'status': 'healthy',
+            'database': 'connected'
+        })
+    except Exception as e:
+        logger.error(f"Health check failed: {str(e)}")
+        return jsonify({
+            'status': 'unhealthy',
+            'error': str(e)
+        }), 500
+
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
