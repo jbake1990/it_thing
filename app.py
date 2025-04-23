@@ -9,6 +9,7 @@ from network_scanner import scan_network
 import json
 from flask_migrate import Migrate
 from urllib.parse import urlparse
+from sqlalchemy import text, inspect
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -867,10 +868,10 @@ def debug_admin():
 def verify_db():
     try:
         # Test database connection
-        db.session.execute('SELECT 1')
+        db.session.execute(text('SELECT 1'))
         
         # Check if User table exists and has correct structure
-        inspector = db.inspect(db.engine)
+        inspector = inspect(db.engine)
         columns = inspector.get_columns('user')
         
         column_info = {}
