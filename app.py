@@ -782,32 +782,55 @@ def health_check():
 @app.route('/setup-admin', methods=['GET'])
 def setup_admin():
     try:
+        logger.info("Attempting to create admin user...")
+        
         # Check if admin user already exists
         admin = User.query.filter_by(username='admin').first()
-        if not admin:
-            # Create new admin user
-            admin = User(
-                username='admin',
-                password_hash=generate_password_hash('admin123'),  # Change this password
-                is_admin=True
-            )
+        if admin:
+            logger.info("Admin user already exists")
+            return jsonify({
+                'status': 'info',
+                'message': 'Admin user already exists.',
+                'admin_details': {
+                    'username': admin.username,
+                    'is_admin': admin.is_admin
+                }
+            })
+        
+        # Create new admin user
+        logger.info("Creating new admin user...")
+        password = 'admin123'
+        password_hash = generate_password_hash(password)
+        logger.info(f"Generated password hash of length: {len(password_hash)}")
+        
+        admin = User(
+            username='admin',
+            password_hash=password_hash,
+            is_admin=True
+        )
+        
+        try:
             db.session.add(admin)
             db.session.commit()
+            logger.info("Admin user created successfully")
             return jsonify({
                 'status': 'success',
                 'message': 'Admin user created successfully!',
                 'credentials': {
                     'username': 'admin',
-                    'password': 'admin123'  # This is just for initial setup
+                    'password': password
                 }
             })
-        else:
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"Database error while creating admin: {str(e)}")
             return jsonify({
-                'status': 'info',
-                'message': 'Admin user already exists.'
-            })
+                'status': 'error',
+                'message': f'Database error: {str(e)}'
+            }), 500
+            
     except Exception as e:
-        logger.error(f"Error creating admin user: {str(e)}")
+        logger.error(f"Error in setup-admin: {str(e)}")
         return jsonify({
             'status': 'error',
             'message': str(e)
@@ -835,6 +858,37 @@ def debug_admin():
             })
     except Exception as e:
         logger.error(f"Debug error: {str(e)}")
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
+@app.route('/verify-db', methods=['GET'])
+def verify_db():
+    try:
+        # Test database connection
+        db.session.execute('SELECT 1')
+        
+        # Check if User table exists and has correct structure
+        inspector = db.inspect(db.engine)
+        columns = inspector.get_columns('user')
+        
+        column_info = {}
+        for col in columns:
+            column_info[col['name']] = {
+                'type': str(col['type']),
+                'nullable': col.get('nullable', True)
+            }
+        
+        return jsonify({
+            'status': 'success',
+            'message': 'Database connection successful',
+            'table_structure': {
+                'user': column_info
+            }
+        })
+    except Exception as e:
+        logger.error(f"Database verification error: {str(e)}")
         return jsonify({
             'status': 'error',
             'message': str(e)
