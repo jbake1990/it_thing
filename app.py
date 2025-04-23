@@ -7,7 +7,7 @@ import os
 import logging
 from network_scanner import scan_network
 import json
-from flask_migrate import Migrate
+from flask_migrate import Migrate, upgrade
 from urllib.parse import urlparse
 from sqlalchemy import text, inspect
 
@@ -890,6 +890,24 @@ def verify_db():
         })
     except Exception as e:
         logger.error(f"Database verification error: {str(e)}")
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
+@app.route('/run-migrations', methods=['GET'])
+def run_migrations():
+    try:
+        logger.info("Running database migrations...")
+        upgrade()
+        logger.info("Migrations completed successfully")
+        
+        return jsonify({
+            'status': 'success',
+            'message': 'Database migrations completed successfully'
+        })
+    except Exception as e:
+        logger.error(f"Migration error: {str(e)}")
         return jsonify({
             'status': 'error',
             'message': str(e)
