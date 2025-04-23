@@ -26,6 +26,7 @@ class NetworkScanner {
             if (!ipRange) {
                 console.log('No IP range provided, attempting to detect local network...');
                 ipRange = await this.detectLocalNetwork();
+                console.log('Detected network range:', ipRange);
             }
 
             // Validate IP range format
