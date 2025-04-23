@@ -4,10 +4,15 @@ from flask_login import LoginManager, UserMixin, login_user, login_required, log
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime
 import os
+import logging
 from network_scanner import scan_network
 import json
 from flask_migrate import Migrate
 from urllib.parse import urlparse
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', os.urandom(24))
@@ -20,8 +25,10 @@ if database_url:
     if parsed.scheme == 'postgres':
         database_url = database_url.replace('postgres://', 'postgresql://', 1)
     app.config['SQLALCHEMY_DATABASE_URI'] = database_url
+    logger.info(f"Using PostgreSQL database: {database_url}")
 else:
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///it_management.db'
+    logger.info("Using SQLite database")
 
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
@@ -34,9 +41,23 @@ login_manager.login_view = 'login'
 @app.before_first_request
 def create_tables():
     try:
+        logger.info("Creating database tables...")
         db.create_all()
+        logger.info("Database tables created successfully")
     except Exception as e:
-        print(f"Error creating database tables: {e}")
+        logger.error(f"Error creating database tables: {str(e)}")
+        raise
+
+# Error handlers
+@app.errorhandler(500)
+def internal_error(error):
+    logger.error(f"500 Error: {str(error)}")
+    return render_template('500.html'), 500
+
+@app.errorhandler(404)
+def not_found_error(error):
+    logger.error(f"404 Error: {str(error)}")
+    return render_template('404.html'), 404
 
 # Database Models
 class User(UserMixin, db.Model):
