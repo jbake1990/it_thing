@@ -38,8 +38,7 @@ login_manager.init_app(app)
 login_manager.login_view = 'login'
 
 # Initialize database
-@app.before_first_request
-def create_tables():
+with app.app_context():
     try:
         logger.info("Creating database tables...")
         db.create_all()
