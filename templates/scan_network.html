@@ -91,12 +91,9 @@ document.addEventListener('DOMContentLoaded', function() {
     const scanButton = document.getElementById('scanButton');
     const scanProgress = document.querySelector('.progress');
     const progressBar = scanProgress.querySelector('.progress-bar');
-    const progressText = scanProgress.querySelector('.progress-text');
     const addAllButton = document.getElementById('addAllButton');
     const ipRangeInput = document.getElementById('ipRange');
     const scanLogs = document.getElementById('scanLogs');
-    const resultsTable = document.getElementById('resultsTable');
-    const devicesInput = document.getElementById('devices');
     
     const scanner = new NetworkScanner();
     
@@ -157,10 +154,9 @@ document.addEventListener('DOMContentLoaded', function() {
     scanButton.addEventListener('click', async function() {
         try {
             // Clear previous results and logs
-            resultsTable.innerHTML = '';
+            devicesList.innerHTML = '';
             scanLogs.innerHTML = '';
             addAllButton.style.display = 'none';
-            devicesInput.value = '[]';
 
             // Show progress bar
             scanProgress.style.display = 'block';
@@ -192,12 +188,11 @@ document.addEventListener('DOMContentLoaded', function() {
                             </button>
                         </td>
                     `;
-                    resultsTable.appendChild(row);
+                    devicesList.appendChild(row);
                 });
 
                 // Show add all button
                 addAllButton.style.display = 'block';
-                devicesInput.value = JSON.stringify(devices);
             } else {
                 appendToLogs('No devices found in the specified range.', 'warning');
             }
