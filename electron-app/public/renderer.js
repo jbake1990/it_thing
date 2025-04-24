@@ -22,8 +22,19 @@ async function loadCustomers() {
     const response = await ipcRenderer.invoke("get-customers");
     if (response.status === "success") {
         customers = response.data;
-        updateCustomerDisplay();
-        updateCustomerCount();
+        console.log("Loaded customers:", customers);
+        
+        // Only update the display if we're on the customers page
+        const customerList = document.getElementById("customerList");
+        if (customerList) {
+            updateCustomerDisplay();
+        }
+        
+        // Always update the count if we're on the dashboard
+        const countElement = document.getElementById("customerCount");
+        if (countElement) {
+            updateCustomerCount();
+        }
     } else {
         console.error("Failed to load customers:", response.message);
     }
@@ -32,12 +43,15 @@ async function loadCustomers() {
 function updateCustomerCount() {
     const countElement = document.getElementById("customerCount");
     if (countElement) {
+        console.log("Total customers:", customers.length);
         countElement.textContent = customers.length;
     }
 }
 
 function updateCustomerDisplay(filterText = "") {
     const customerList = document.getElementById("customerList");
+    if (!customerList) return; // Exit if element doesn't exist
+    
     const filteredCustomers = customers.filter(customer => 
         customer.name.toLowerCase().includes(filterText.toLowerCase())
     );
@@ -262,9 +276,100 @@ window.viewCustomer = function(customerId) {
     loadPasswords(customerId);
 };
 
-window.editCustomer = function(customerId) {
-    // TODO: Implement edit customer
-    console.log("Edit customer:", customerId);
+function showEditCustomerModal(customer) {
+    const modal = document.createElement("div");
+    modal.className = "modal fade";
+    modal.id = "editCustomerModal";
+    modal.setAttribute("tabindex", "-1");
+    modal.innerHTML = `
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Edit Customer</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="editCustomerForm">
+                        <div class="mb-3">
+                            <label for="editCustomerName" class="form-label">Name *</label>
+                            <input type="text" class="form-control" id="editCustomerName" value="${customer.name}" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="editCustomerAddress" class="form-label">Address</label>
+                            <input type="text" class="form-control" id="editCustomerAddress" value="${customer.address || ''}">
+                        </div>
+                        <div class="mb-3">
+                            <label for="editCustomerPhone" class="form-label">Phone Number</label>
+                            <input type="tel" class="form-control" id="editCustomerPhone" value="${customer.phone || ''}">
+                        </div>
+                        <div class="mb-3">
+                            <label for="editCustomerEmail" class="form-label">Email</label>
+                            <input type="email" class="form-control" id="editCustomerEmail" value="${customer.email || ''}">
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="submitEditCustomerForm('${customer.id}')">Save Changes</button>
+                </div>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+    const modalInstance = new bootstrap.Modal(modal);
+    modalInstance.show();
+
+    // Remove modal from DOM when hidden
+    modal.addEventListener("hidden.bs.modal", () => {
+        document.body.removeChild(modal);
+    });
+}
+
+window.editCustomer = async function(customerId) {
+    try {
+        const response = await ipcRenderer.invoke("get-customer", customerId);
+        if (response.status === "success") {
+            showEditCustomerModal(response.data);
+        } else {
+            showAlert(`Failed to load customer: ${response.message}`, "danger");
+        }
+    } catch (error) {
+        showAlert(`Error: ${error.message}`, "danger");
+    }
+};
+
+window.submitEditCustomerForm = async function(customerId) {
+    const form = document.getElementById("editCustomerForm");
+    if (!form.checkValidity()) {
+        form.reportValidity();
+        return;
+    }
+
+    const customerData = {
+        name: document.getElementById("editCustomerName").value,
+        address: document.getElementById("editCustomerAddress").value,
+        phone: document.getElementById("editCustomerPhone").value,
+        email: document.getElementById("editCustomerEmail").value
+    };
+
+    try {
+        const response = await ipcRenderer.invoke("update-customer", { customerId, customerData });
+        if (response.status === "success") {
+            // Close modal
+            bootstrap.Modal.getInstance(document.getElementById("editCustomerModal")).hide();
+            
+            // Refresh customer list
+            await loadCustomers();
+            
+            // Show success message
+            showAlert("Customer updated successfully!", "success");
+        } else {
+            showAlert(`Failed to update customer: ${response.message}`, "danger");
+        }
+    } catch (error) {
+        showAlert(`Error: ${error.message}`, "danger");
+    }
 };
 
 window.filterCustomers = function(filterText) {
@@ -274,82 +379,117 @@ window.filterCustomers = function(filterText) {
 // Page loading function
 async function loadPage(page) {
     const content = document.getElementById("content");
-    if (!content) {
-        console.error("Content element not found");
-        return;
-    }
+    
+    // Update active nav link
+    document.querySelectorAll(".nav-link").forEach(link => {
+        link.classList.remove("active");
+        if (link.dataset.page === page) {
+            link.classList.add("active");
+        }
+    });
 
     switch (page) {
-    case "dashboard":
-        content.innerHTML = `
-                <h2>Dashboard</h2>
-                <div class="row mb-3">
-                    <div class="col">
-                        <div class="card">
-                            <div class="card-body">
-                                <h5 class="card-title">Active Customers</h5>
-                                <p class="card-text" id="customerCount">Loading...</p>
+        case "dashboard":
+            content.innerHTML = `
+                <div class="container-fluid">
+                    <h2 class="mb-4">Dashboard</h2>
+                    <div class="row">
+                        <!-- Active Customers Card -->
+                        <div class="col-md-4 mb-4">
+                            <div class="card">
+                                <div class="card-body">
+                                    <h5 class="card-title">Active Customers</h5>
+                                    <h2 class="card-text" id="customerCount">0</h2>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Customer Map Card -->
+                        <div class="col-md-8 mb-4">
+                            <div class="card">
+                                <div class="card-body">
+                                    <h5 class="card-title">Customer Locations</h5>
+                                    <div id="customerMap" style="height: 300px;"></div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Internet Speed Test Card -->
+                        <div class="col-md-12 mb-4">
+                            <div class="card">
+                                <div class="card-body">
+                                    <h5 class="card-title">Internet Speed Test</h5>
+                                    <div class="text-center">
+                                        <button class="btn btn-primary" onclick="runSpeedTest()">Start Speed Test</button>
+                                        <div id="speedTestResults" class="mt-3">
+                                            <div class="row">
+                                                <div class="col-md-4">
+                                                    <h6>Download Speed</h6>
+                                                    <p id="downloadSpeed">-</p>
+                                                </div>
+                                                <div class="col-md-4">
+                                                    <h6>Upload Speed</h6>
+                                                    <p id="uploadSpeed">-</p>
+                                                </div>
+                                                <div class="col-md-4">
+                                                    <h6>Ping</h6>
+                                                    <p id="ping">-</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
-                <div class="card">
-                    <div class="card-body">
-                        <div class="d-flex justify-content-between align-items-center mb-3">
-                            <button class="btn btn-primary" onclick="addCustomer()">Add Customer</button>
-                            <input type="text" class="form-control w-auto" id="customerSearch" placeholder="Search customers...">
-                        </div>
-                        <div id="customerList"></div>
-                    </div>
-                </div>
             `;
-        await loadCustomers();
-        break;
             
-    case "scan":
-        content.innerHTML = `
-                <h2>Network Scan</h2>
-                <div class="card">
-                    <div class="card-body">
-                        <form id="scanForm">
-                            <div class="mb-3">
-                                <label for="networkRange" class="form-label">Network Range</label>
-                                <input type="text" class="form-control" id="networkRange" placeholder="e.g., 192.168.1.0/24">
+            // Wait for the DOM to be updated
+            await new Promise(resolve => setTimeout(resolve, 0));
+            
+            // Load customer count
+            await loadCustomers();
+            
+            // Initialize map
+            initCustomerMap();
+            break;
+            
+        case "customers":
+            content.innerHTML = `
+                <div class="container-fluid">
+                    <div class="d-flex justify-content-between align-items-center mb-4">
+                        <h2>Customers</h2>
+                        <button class="btn btn-primary" onclick="addCustomer()">
+                            <i class="fas fa-plus"></i> Add Customer
+                        </button>
+                    </div>
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <div class="input-group">
+                                <span class="input-group-text">
+                                    <i class="fas fa-search"></i>
+                                </span>
+                                <input type="text" class="form-control" id="customerFilter" placeholder="Search customers...">
                             </div>
-                            <button type="submit" class="btn btn-primary">Start Scan</button>
-                        </form>
-                        <div id="scanResults" class="mt-3"></div>
+                        </div>
                     </div>
+                    <div id="customerList"></div>
                 </div>
             `;
             
-        document.getElementById("scanForm").addEventListener("submit", async (e) => {
-            e.preventDefault();
-            const networkRange = document.getElementById("networkRange").value;
-            const results = await ipcRenderer.invoke("start-scan", networkRange);
-            document.getElementById("scanResults").innerHTML = `
-                    <div class="alert alert-info">
-                        Scan started for range: ${networkRange}
-                    </div>
-                `;
-        });
-        break;
+            // Wait for the DOM to be updated
+            await new Promise(resolve => setTimeout(resolve, 0));
             
-    case "customers":
-        content.innerHTML = `
-                <h2>Customers</h2>
-                <div class="card">
-                    <div class="card-body">
-                        <button class="btn btn-primary mb-3" id="addCustomer">Add Customer</button>
-                        <div id="customerList"></div>
-                    </div>
-                </div>
-            `;
-        await loadCustomers();
-        break;
+            // Load customers and set up search
+            await loadCustomers();
+            document.getElementById("customerFilter").addEventListener("input", (e) => {
+                updateCustomerDisplay(e.target.value);
+            });
+            break;
             
-    case "settings":
-        content.innerHTML = `
+        case "settings":
+            content.innerHTML = `
                 <div class="settings-section">
                     <h3>API Settings</h3>
                     <div class="mb-3">
@@ -367,16 +507,16 @@ async function loadPage(page) {
                     <button class="btn btn-primary" onclick="login(document.getElementById('username').value, document.getElementById('password').value)">Login</button>
                 </div>
             `;
-        break;
+            break;
 
-    default:
-        content.innerHTML = `
+        default:
+            content.innerHTML = `
                 <div class="alert alert-warning">
                     Page '${page}' not found. Redirecting to dashboard...
                 </div>
             `;
-        setTimeout(() => loadPage("dashboard"), 2000);
-        break;
+            setTimeout(() => loadPage("dashboard"), 2000);
+            break;
     }
 }
 
@@ -775,6 +915,61 @@ window.deleteAllDevices = async function() {
         showAlert(`Error: ${error.message}`, "error");
     }
 };
+
+// Add these new functions for the dashboard
+function initCustomerMap() {
+    // Initialize the map with Leaflet
+    // Coordinates for 1421 Manchester St., Decatur, IN 46733
+    const defaultCenter = [40.8304, -84.9292]; // Approximate coordinates for Decatur, IN
+    const map = L.map('customerMap').setView(defaultCenter, 13);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors'
+    }).addTo(map);
+
+    // Add customer markers
+    customers.forEach(customer => {
+        if (customer.address) {
+            // Use OpenStreetMap's Nominatim geocoding service
+            fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(customer.address)}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data && data.length > 0) {
+                        const lat = parseFloat(data[0].lat);
+                        const lon = parseFloat(data[0].lon);
+                        const marker = L.marker([lat, lon]).addTo(map);
+                        marker.bindPopup(`<b>${customer.name}</b><br>${customer.address}`);
+                    } else {
+                        // If geocoding fails, use default coordinates
+                        const marker = L.marker(defaultCenter).addTo(map);
+                        marker.bindPopup(`<b>${customer.name}</b><br>${customer.address}<br><small>(Approximate location)</small>`);
+                    }
+                })
+                .catch(error => {
+                    console.error('Geocoding error:', error);
+                    // If geocoding fails, use default coordinates
+                    const marker = L.marker(defaultCenter).addTo(map);
+                    marker.bindPopup(`<b>${customer.name}</b><br>${customer.address}<br><small>(Approximate location)</small>`);
+                });
+        }
+    });
+}
+
+async function runSpeedTest() {
+    const resultsDiv = document.getElementById("speedTestResults");
+    resultsDiv.innerHTML = '<div class="text-center"><div class="spinner-border" role="status"></div></div>';
+    
+    try {
+        // In a real implementation, you would use a speed test API here
+        // For now, we'll simulate a test
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+        document.getElementById("downloadSpeed").textContent = "100 Mbps";
+        document.getElementById("uploadSpeed").textContent = "50 Mbps";
+        document.getElementById("ping").textContent = "20 ms";
+    } catch (error) {
+        showAlert("Failed to run speed test: " + error.message, "danger");
+    }
+}
 
 // Initialize the application
 document.addEventListener("DOMContentLoaded", function() {

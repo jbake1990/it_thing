@@ -194,6 +194,19 @@ app.get('/api/customers/:id', authenticateToken, async (req, res) => {
   }
 });
 
+app.put('/api/customers/:id', authenticateToken, async (req, res) => {
+  try {
+    const customer = await Customer.findByPk(req.params.id);
+    if (!customer) {
+      return res.status(404).json({ message: 'Customer not found' });
+    }
+    await customer.update(req.body);
+    res.json(customer);
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+});
+
 // Network scanning endpoints
 app.post('/api/network/scan', authenticateToken, async (req, res) => {
   const { customerId } = req.body;

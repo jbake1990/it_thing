@@ -62,6 +62,24 @@ ipcMain.handle("add-customer", async (event, customerData) => {
     }
 });
 
+ipcMain.handle("update-customer", async (event, { customerId, customerData }) => {
+    const settings = store.get("settings");
+    if (!settings.apiEndpoint || !settings.apiKey) {
+        return { status: "error", message: "API settings not configured" };
+    }
+
+    try {
+        const response = await axios.put(`${settings.apiEndpoint}/customers/${customerId}`, customerData, {
+            headers: {
+                "Authorization": `Bearer ${settings.apiKey}`
+            }
+        });
+        return { status: "success", data: response.data };
+    } catch (error) {
+        return { status: "error", message: error.response?.data?.message || error.message };
+    }
+});
+
 ipcMain.handle("get-customers", async () => {
     const settings = store.get("settings");
     if (!settings.apiEndpoint || !settings.apiKey) {
