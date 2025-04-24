@@ -1,94 +1,50 @@
-# IT Management System
+# Network Manager Desktop
 
-A web-based application for IT technicians to manage customer network information, credentials, and network topology.
+A cross-platform desktop application for network management with cloud database integration.
 
-## Features
+## Project Structure
 
-- Secure user authentication
-- Customer management
-- Network information tracking
-- Credential management
-- Responsive, modern UI
-- Search functionality
-- Password visibility toggle
-
-## Setup
-
-1. Create a virtual environment:
-```bash
-python -m venv venv
+```
+.
+├── electron-app/           # Main application directory
+│   ├── src/               # Source files
+│   │   ├── main.js        # Main process
+│   │   └── networkScanner.js  # Network scanning module
+│   ├── public/            # Renderer process files
+│   │   ├── index.html     # Main window
+│   │   └── renderer.js    # Renderer process
+│   ├── package.json       # Project configuration
+│   └── README.md          # Application documentation
+└── old_web_app_backup/    # Backup of the previous web application
 ```
 
-2. Activate the virtual environment:
-- Windows:
+## Quick Start
+
+1. Install dependencies:
 ```bash
-venv\Scripts\activate
-```
-- Linux/Mac:
-```bash
-source venv/bin/activate
+cd electron-app
+npm install
 ```
 
-3. Install dependencies:
+2. Start the application:
 ```bash
-pip install -r requirements.txt
+npm run dev
 ```
 
-4. Initialize the database:
+3. Build the application:
 ```bash
-python
->>> from app import app, db
->>> with app.app_context():
-...     db.create_all()
->>> exit()
+npm run build
 ```
 
-5. Create an admin user:
-```bash
-python
->>> from app import app, db, User
->>> from werkzeug.security import generate_password_hash
->>> with app.app_context():
-...     admin = User(username='admin', password_hash=generate_password_hash('your_password'), is_admin=True)
-...     db.session.add(admin)
-...     db.session.commit()
->>> exit()
-```
+## Development
 
-6. Run the application:
-```bash
-python app.py
-```
+- `npm run dev` - Start the application in development mode
+- `npm run build` - Build the application for distribution
 
-The application will be available at `http://localhost:5000`
+## Documentation
 
-## Usage
-
-1. Log in with your admin credentials
-2. Add customers using the "Add Customer" button
-3. For each customer, you can:
-   - Add network information (IP addresses, subnet masks, etc.)
-   - Add credentials (usernames, passwords, service information)
-   - View and manage all information in a organized interface
-
-## Security Notes
-
-- All passwords are hashed before storage
-- The application uses secure session management
-- IP addresses are validated before storage
-- Credentials are masked by default with a visibility toggle
-
-## Requirements
-
-- Python 3.8+
-- Flask
-- SQLAlchemy
-- Flask-Login
-- Flask-WTF
-- Werkzeug
-- python-dotenv
-- cryptography
+For detailed documentation, please refer to the [electron-app/README.md](electron-app/README.md) file.
 
 ## License
 
-This project is licensed under the MIT License. 
+ISC 

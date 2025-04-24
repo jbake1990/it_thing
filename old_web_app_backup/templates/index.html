@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>Customers</h2>
+    <a href="{{ url_for('add_customer') }}" class="btn btn-primary">
+        <i class="fas fa-plus me-2"></i>Add Customer
+    </a>
+</div>
+
+<div class="card mb-4">
+    <div class="card-body">
+        <input type="text" id="customerSearch" class="form-control" placeholder="Search customers...">
+    </div>
+</div>
+
+<div class="row" id="customerList">
+    {% for customer in customers %}
+    <div class="col-md-6 col-lg-4 mb-4 customer-card">
+        <div class="card h-100">
+            <div class="card-body">
+                <h5 class="card-title">{{ customer.name }}</h5>
+                <p class="card-text">
+                    <strong>Contact:</strong> {{ customer.contact_person }}<br>
+                    <strong>Phone:</strong> {{ customer.phone }}<br>
+                    <strong>Email:</strong> {{ customer.email }}
+                </p>
+                <div class="d-flex justify-content-between align-items-center">
+                    <a href="{{ url_for('customer_details', customer_id=customer.id) }}" class="btn btn-primary">
+                        <i class="fas fa-info-circle me-2"></i>Details
+                    </a>
+                    <small class="text-muted">Added: {{ customer.created_at.strftime('%Y-%m-%d') }}</small>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<script>
+document.getElementById('customerSearch').addEventListener('input', function(e) {
+    const searchTerm = e.target.value.toLowerCase();
+    const customerCards = document.querySelectorAll('.customer-card');
+    
+    customerCards.forEach(card => {
+        const customerName = card.querySelector('.card-title').textContent.toLowerCase();
+        const customerContact = card.querySelector('.card-text').textContent.toLowerCase();
+        
+        if (customerName.includes(searchTerm) || customerContact.includes(searchTerm)) {
+            card.style.display = '';
+        } else {
+            card.style.display = 'none';
+        }
+    });
+});
+</script>
+{% endblock %} 

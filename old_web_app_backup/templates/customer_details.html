@@ -1,0 +1,367 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h4 class="mb-0">{{ customer.name }}</h4>
+                    <div>
+                        <a href="{{ url_for('edit_customer', customer_id=customer.id) }}" class="btn btn-primary">
+                            <i class="fas fa-edit me-2"></i>Edit Customer
+                        </a>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h5>Contact Information</h5>
+                            <p><strong>Address:</strong> {{ customer.address or 'Not provided' }}</p>
+                            <p><strong>Contact Person:</strong> {{ customer.contact_person or 'Not provided' }}</p>
+                            <p><strong>Phone:</strong> {{ customer.phone or 'Not provided' }}</p>
+                            <p><strong>Email:</strong> {{ customer.email or 'Not provided' }}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <h5>Account Information</h5>
+                            <p><strong>Created:</strong> {{ customer.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</p>
+                            <p><strong>Network Devices:</strong> {{ customer.network_info|length }}</p>
+                            <p><strong>Passwords:</strong> {{ customer.credentials|length }}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabs Navigation -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <ul class="nav nav-tabs" id="customerTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="network-tab" data-bs-toggle="tab" data-bs-target="#network" type="button" role="tab" aria-controls="network" aria-selected="true">
+                        <i class="fas fa-network-wired me-2"></i>Network Information
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="cctv-tab" data-bs-toggle="tab" data-bs-target="#cctv" type="button" role="tab" aria-controls="cctv" aria-selected="false">
+                        <i class="fas fa-video me-2"></i>CCTV
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="credentials-tab" data-bs-toggle="tab" data-bs-target="#credentials" type="button" role="tab" aria-controls="credentials" aria-selected="false">
+                        <i class="fas fa-key me-2"></i>Passwords
+                    </button>
+                </li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Tabs Content -->
+    <div class="tab-content" id="customerTabsContent">
+        <!-- Network Information Tab -->
+        <div class="tab-pane fade show active" id="network" role="tabpanel">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h3>Network Information</h3>
+                <div>
+                    <button type="button" class="btn btn-primary me-2" data-bs-toggle="modal" data-bs-target="#scanNetworkModal">Scan Network</button>
+                    <a href="{{ url_for('add_network_info', customer_id=customer.id) }}" class="btn btn-success">Add Network Info</a>
+                </div>
+            </div>
+            
+            {% set system_types = ['Networking Hardware', 'Control4', 'A/V Hardware', 'Security', 'Access Control', 'Undefined'] %}
+            {% for system_type in system_types %}
+                {% set devices = customer.network_info|selectattr('system_type', 'equalto', system_type)|list %}
+                {% if devices %}
+                    <div class="card mb-4">
+                        <div class="card-header bg-light">
+                            <h4 class="mb-0">{{ system_type }}</h4>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>Device Name</th>
+                                            <th>IP Address</th>
+                                            <th>MAC Address</th>
+                                            <th>Interface</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for device in devices %}
+                                        <tr>
+                                            <td>{{ device.device_name }}</td>
+                                            <td>{{ device.ip_address }}</td>
+                                            <td>{{ device.mac_address }}</td>
+                                            <td>{{ device.interface }}</td>
+                                            <td>
+                                                <a href="{{ url_for('edit_network_info', customer_id=customer.id, network_id=device.id) }}" class="btn btn-sm btn-primary">Edit</a>
+                                                <form action="{{ url_for('delete_network_info', customer_id=customer.id, network_id=device.id) }}" method="POST" class="d-inline">
+                                                    <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Are you sure you want to delete this device?')">Delete</button>
+                                                </form>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                {% endif %}
+            {% endfor %}
+            
+            {% if not customer.network_info %}
+            <div class="alert alert-info">
+                No network information available. Click "Add Network Info" or "Scan Network" to add devices.
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- CCTV Tab -->
+        <div class="tab-pane fade" id="cctv" role="tabpanel" aria-labelledby="cctv-tab">
+            {% if cctv_devices %}
+                <!-- CCTV Devices Section -->
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">CCTV Devices</h5>
+                        <a href="{{ url_for('add_network_info', customer_id=customer.id) }}" class="btn btn-primary btn-sm">
+                            <i class="fas fa-plus me-2"></i>Add CCTV Device
+                        </a>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Device Name</th>
+                                        <th>IP Address</th>
+                                        <th>Type</th>
+                                        <th>Manufacturer</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for device in cctv_devices %}
+                                    <tr>
+                                        <td>{{ device.device_name }}</td>
+                                        <td>{{ device.ip_address }}</td>
+                                        <td>{{ device.cctv_type }}</td>
+                                        <td>{{ device.cctv_manufacturer }}</td>
+                                        <td>
+                                            <a href="{{ url_for('edit_network_info', customer_id=customer.id, network_id=device.id) }}" class="btn btn-sm btn-outline-primary">
+                                                <i class="fas fa-edit"></i>
+                                            </a>
+                                            <a href="{{ url_for('delete_network_info', customer_id=customer.id, network_id=device.id) }}" class="btn btn-sm btn-outline-danger" onclick="return confirm('Are you sure you want to delete this device?')">
+                                                <i class="fas fa-trash"></i>
+                                            </a>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Users Section -->
+                <div class="card mt-4">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">Users</h5>
+                        <a href="{{ url_for('add_cctv_user', customer_id=customer.id) }}" class="btn btn-primary btn-sm">
+                            <i class="fas fa-user-plus me-2"></i>Add User
+                        </a>
+                    </div>
+                    <div class="card-body">
+                        {% if cctv_users %}
+                            <div class="table-responsive">
+                                <table class="table table-sm">
+                                    <thead>
+                                        <tr>
+                                            <th>Username</th>
+                                            <th>Password</th>
+                                            <th>Created</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for user in cctv_users %}
+                                        <tr>
+                                            <td>{{ user.username }}</td>
+                                            <td>
+                                                <div class="input-group input-group-sm">
+                                                    <input type="password" class="form-control form-control-sm" value="{{ user.password }}" readonly>
+                                                    <button class="btn btn-outline-secondary btn-sm" type="button" onclick="togglePassword(this)">
+                                                        <i class="fas fa-eye"></i>
+                                                    </button>
+                                                </div>
+                                            </td>
+                                            <td>{{ user.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                                            <td>
+                                                <a href="{{ url_for('edit_cctv_user', customer_id=customer.id, user_id=user.id) }}" class="btn btn-sm btn-outline-primary">
+                                                    <i class="fas fa-edit"></i>
+                                                </a>
+                                                <form action="{{ url_for('delete_cctv_user', customer_id=customer.id, user_id=user.id) }}" method="POST" class="d-inline">
+                                                    <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Are you sure you want to delete this user?')">
+                                                        <i class="fas fa-trash"></i>
+                                                    </button>
+                                                </form>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        {% else %}
+                            <div class="alert alert-info mb-0">
+                                No CCTV users found. Add a user to get started.
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            {% else %}
+                <div class="alert alert-info">
+                    No CCTV devices found. Add a CCTV device to get started.
+                </div>
+            {% endif %}
+        </div>
+
+        <!-- Credentials Tab -->
+        <div class="tab-pane fade" id="credentials" role="tabpanel">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0">Passwords</h5>
+                    <a href="{{ url_for('add_credential', customer_id=customer.id) }}" class="btn btn-primary">
+                        <i class="fas fa-plus me-2"></i>Add Password
+                    </a>
+                </div>
+                <div class="card-body">
+                    {% if customer.credentials %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Service</th>
+                                    <th>Username</th>
+                                    <th>Password</th>
+                                    <th>Notes</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for cred in customer.credentials %}
+                                <tr>
+                                    <td>{{ cred.service_name }}</td>
+                                    <td>{{ cred.username }}</td>
+                                    <td>
+                                        <div class="input-group">
+                                            <input type="password" class="form-control form-control-sm" value="{{ cred.password }}" readonly>
+                                            <button class="btn btn-sm btn-outline-secondary" type="button" onclick="togglePassword(this)">
+                                                <i class="fas fa-eye"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                    <td>{{ cred.notes }}</td>
+                                    <td>
+                                        <div class="btn-group">
+                                            <a href="{{ url_for('edit_credential', customer_id=customer.id, credential_id=cred.id) }}" 
+                                               class="btn btn-sm btn-outline-primary">
+                                                <i class="fas fa-edit"></i>
+                                            </a>
+                                            <form method="POST" action="{{ url_for('delete_credential', customer_id=customer.id, credential_id=cred.id) }}" 
+                                                  class="d-inline" onsubmit="return confirm('Are you sure you want to delete this credential?');">
+                                                <button type="submit" class="btn btn-sm btn-outline-danger">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </form>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <p class="text-muted">No passwords available.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Scan Network Warning Modal -->
+<div class="modal fade" id="scanNetworkModal" tabindex="-1" aria-labelledby="scanNetworkModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="scanNetworkModalLabel">Warning</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-danger"><strong>This feature is for on-site use ONLY.</strong></p>
+                <p>Are you sure you want to proceed with the network scan?</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Go Back</button>
+                <a href="{{ url_for('scan_network_route', customer_id=customer.id) }}" class="btn btn-primary">Proceed</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function togglePassword(button) {
+    const input = button.parentElement.querySelector('input');
+    const icon = button.querySelector('i');
+    
+    if (input.type === 'password') {
+        input.type = 'text';
+        icon.classList.remove('fa-eye');
+        icon.classList.add('fa-eye-slash');
+    } else {
+        input.type = 'password';
+        icon.classList.remove('fa-eye-slash');
+        icon.classList.add('fa-eye');
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Get the active tab from the URL hash or default to network
+    let activeTab = window.location.hash || '#network';
+    
+    // Find the tab button and content
+    const tabButton = document.querySelector(`[data-bs-target="${activeTab}"]`);
+    const tabContent = document.querySelector(activeTab);
+    
+    if (tabButton && tabContent) {
+        // Remove active class from all tabs
+        document.querySelectorAll('.nav-link').forEach(link => {
+            link.classList.remove('active');
+            link.setAttribute('aria-selected', 'false');
+        });
+        
+        // Add active class to the selected tab
+        tabButton.classList.add('active');
+        tabButton.setAttribute('aria-selected', 'true');
+        
+        // Show the selected tab content
+        document.querySelectorAll('.tab-pane').forEach(pane => {
+            pane.classList.remove('show', 'active');
+        });
+        
+        tabContent.classList.add('show', 'active');
+    }
+    
+    // Add event listener for tab changes
+    document.querySelectorAll('.nav-link').forEach(link => {
+        link.addEventListener('click', function(e) {
+            // Update the URL hash without scrolling
+            const target = this.getAttribute('data-bs-target');
+            history.pushState(null, null, target);
+        });
+    });
+});
+</script>
+{% endblock %} 
