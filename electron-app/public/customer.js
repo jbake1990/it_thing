@@ -45,12 +45,15 @@ function displayScanResults(devices) {
     const scanResults = document.getElementById("scanResults");
     
     devicesList.innerHTML = "";
-    devices.forEach(device => {
-        const deviceCard = createDeviceCard(device);
-        devicesList.appendChild(deviceCard);
-    });
-    
-    scanResults.classList.remove("hidden");
+    if (devices && devices.length > 0) {
+        devices.forEach(device => {
+            const deviceCard = createDeviceCard(device);
+            devicesList.appendChild(deviceCard);
+        });
+        scanResults.classList.remove("hidden");
+    } else {
+        scanResults.classList.add("hidden");
+    }
 }
 
 // Device Management Functions

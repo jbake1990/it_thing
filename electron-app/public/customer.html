@@ -18,7 +18,31 @@
             margin-bottom: 10px;
         }
         .hidden {
-            display: none;
+            display: none !important;
+            visibility: hidden !important;
+        }
+        /* Custom tab styling */
+        .nav-tabs {
+            border-bottom: 1px solid #dee2e6;
+        }
+        .nav-tabs .nav-link {
+            color: #495057;
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-bottom: none;
+            margin-right: 5px;
+            border-radius: 4px 4px 0 0;
+            padding: 10px 20px;
+        }
+        .nav-tabs .nav-link:hover {
+            background-color: #e9ecef;
+            border-color: #dee2e6;
+        }
+        .nav-tabs .nav-link.active {
+            color: #0d6efd;
+            background-color: #fff;
+            border-color: #dee2e6 #dee2e6 #fff;
+            font-weight: 500;
         }
     </style>
 </head>

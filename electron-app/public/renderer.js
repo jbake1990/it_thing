@@ -207,7 +207,6 @@ window.viewCustomer = function(customerId) {
                         <div class="col-md-12">
                             <button class="btn btn-primary mb-3" onclick="scanNetwork()">Scan Network</button>
                             <div id="scanResults" class="hidden">
-                                <h4>Scan Results</h4>
                                 <div id="devicesList" class="row"></div>
                             </div>
                         </div>
@@ -297,7 +296,7 @@ async function loadPage(page) {
                 <div class="card">
                     <div class="card-body">
                         <div class="d-flex justify-content-between align-items-center mb-3">
-                            <button class="btn btn-primary" id="addCustomer">Add Customer</button>
+                            <button class="btn btn-primary" onclick="addCustomer()">Add Customer</button>
                             <input type="text" class="form-control w-auto" id="customerSearch" placeholder="Search customers...">
                         </div>
                         <div id="customerList"></div>
@@ -594,8 +593,12 @@ function updateScanResults(results) {
     const devicesList = document.getElementById("devicesList");
     const scanResults = document.getElementById("scanResults");
     
-    // Add Save All button at the top
-    scanResults.innerHTML = `
+    // Remove hidden class to show the results
+    scanResults.classList.remove("hidden");
+    
+    // Create the content without overwriting the entire div
+    const content = `
+        <h4>Scan Results</h4>
         <div class="row mb-3">
             <div class="col-12">
                 <button class="btn btn-success" onclick="saveAllDevices()">
@@ -624,6 +627,9 @@ function updateScanResults(results) {
             `).join("")}
         </div>
     `;
+    
+    // Update the scanResults div
+    scanResults.innerHTML = content;
 }
 
 function updateSavedDevices(devices) {

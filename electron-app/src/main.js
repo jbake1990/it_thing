@@ -27,9 +27,6 @@ function createWindow() {
 
     // Load the index.html file
     mainWindow.loadFile(path.join(__dirname, "../public/index.html"));
-
-    // Always open DevTools for debugging
-    mainWindow.webContents.openDevTools();
 }
 
 app.whenReady().then(createWindow);
