@@ -249,6 +249,23 @@ app.delete('/api/devices/:id', authenticateToken, async (req, res) => {
   }
 });
 
+// Delete all devices for a customer
+app.delete('/api/devices', authenticateToken, async (req, res) => {
+  try {
+    const { customerId } = req.query;
+    if (!customerId) {
+      return res.status(400).json({ message: 'Customer ID is required' });
+    }
+    
+    await Device.destroy({
+      where: { customer_id: customerId }
+    });
+    res.status(204).send();
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
 // CCTV endpoints
 app.get('/api/cctv', authenticateToken, async (req, res) => {
   try {

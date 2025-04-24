@@ -429,23 +429,7 @@ async function loadSavedDevices(customerId) {
     try {
         const response = await ipcRenderer.invoke("get-devices", { customerId, type: "network" });
         if (response.status === "success") {
-            const devicesList = document.getElementById("savedDevicesList");
-            devicesList.innerHTML = response.data.map(device => `
-                <div class="col-md-4 mb-3">
-                    <div class="card">
-                        <div class="card-body">
-                            <h5 class="card-title">${device.ip}</h5>
-                            <p class="card-text">
-                                <strong>MAC:</strong> ${device.mac}<br>
-                                <strong>Last Seen:</strong> ${new Date(device.last_seen).toLocaleString()}
-                            </p>
-                            <button class="btn btn-danger btn-sm" onclick="deleteDevice('${device.id}')">
-                                Delete
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            `).join("");
+            updateSavedDevices(response.data);
         }
     } catch (error) {
         showAlert(`Error loading devices: ${error.message}`, "danger");
@@ -537,9 +521,10 @@ window.scanNetwork = async function() {
                 <div class="modal-body">
                     <form id="scanForm">
                         <div class="mb-3">
-                            <label for="networkRange" class="form-label">Network Range</label>
+                            <label for="networkRange" class="form-label">Network Range (Optional)</label>
                             <input type="text" class="form-control" id="networkRange" 
-                                   placeholder="e.g., 192.168.1.0/24" required>
+                                   placeholder="e.g., 192.168.1.0/24">
+                            <div class="form-text">Leave empty for automatic network detection</div>
                         </div>
                     </form>
                     <div id="scanProgress" class="mt-3" style="display: none;">
@@ -569,12 +554,7 @@ window.scanNetwork = async function() {
 };
 
 window.startNetworkScan = async function() {
-    const networkRange = document.getElementById("networkRange").value;
-    if (!networkRange) {
-        showAlert("Please enter a network range", "warning");
-        return;
-    }
-
+    const networkRange = document.getElementById("networkRange").value.trim();
     const scanProgress = document.getElementById("scanProgress");
     const scanForm = document.getElementById("scanForm");
     const scanResults = document.getElementById("scanResults");
@@ -585,113 +565,208 @@ window.startNetworkScan = async function() {
     scanForm.style.display = "none";
     
     try {
-        const response = await ipcRenderer.invoke("start-scan", networkRange);
+        console.log('Starting network scan...');
+        const response = await ipcRenderer.invoke("start-scan", networkRange || null);
+        
         if (response.status === "success") {
-            // Hide progress and show results
-            scanProgress.style.display = "none";
-            scanForm.style.display = "block";
-            
-            // Display results
-            scanResults.classList.remove("hidden");
-            devicesList.innerHTML = `
-                <div class="col-12 mb-3">
-                    <button class="btn btn-success" onclick="saveAllDevices()">
-                        <i class="fas fa-save"></i> Save All Devices
-                    </button>
+            console.log('Scan completed successfully');
+            if (response.results && response.results.length > 0) {
+                // Update the UI with scan results
+                updateScanResults(response.results);
+                showAlert(`Found ${response.results.length} devices`, "success");
+            } else {
+                showAlert("No devices found in the specified range", "warning");
+            }
+        } else {
+            console.error('Scan failed:', response.message);
+            showAlert(response.message, "error");
+        }
+    } catch (error) {
+        console.error('Scan error:', error);
+        showAlert(`Scan failed: ${error.message}`, "error");
+    } finally {
+        scanProgress.style.display = "none";
+        scanForm.style.display = "block";
+    }
+};
+
+function updateScanResults(results) {
+    const devicesList = document.getElementById("devicesList");
+    const scanResults = document.getElementById("scanResults");
+    
+    // Add Save All button at the top
+    scanResults.innerHTML = `
+        <div class="row mb-3">
+            <div class="col-12">
+                <button class="btn btn-success" onclick="saveAllDevices()">
+                    <i class="fas fa-save"></i> Save All Devices
+                </button>
+            </div>
+        </div>
+        <div class="row" id="devicesList">
+            ${results.map(device => `
+                <div class="col-md-4 mb-3">
+                    <div class="card">
+                        <div class="card-body">
+                            <h5 class="card-title">${device.ip}</h5>
+                            <p class="card-text">
+                                <strong>Hostname:</strong> ${device.hostname}<br>
+                                <strong>MAC:</strong> ${device.mac}<br>
+                                <strong>OS:</strong> ${device.os}<br>
+                                <strong>Open Ports:</strong> ${device.openPorts.join(", ") || "None"}
+                            </p>
+                            <button class="btn btn-primary btn-sm" onclick="saveDevice('${device.ip}', '${device.mac}')">
+                                Save Device
+                            </button>
+                        </div>
+                    </div>
                 </div>
-                ${response.results.map(device => `
-                    <div class="col-md-4 mb-3">
-                        <div class="card">
-                            <div class="card-body">
-                                <h5 class="card-title">${device.ip}</h5>
-                                <p class="card-text">
-                                    <strong>Hostname:</strong> ${device.hostname}<br>
-                                    <strong>MAC:</strong> ${device.mac}<br>
-                                    <strong>OS:</strong> ${device.os}<br>
-                                    <strong>Open Ports:</strong> ${device.openPorts.join(", ") || "None"}
-                                </p>
-                                <button class="btn btn-primary btn-sm" onclick="saveDevice('${device.ip}', '${device.mac}')">
-                                    Save Device
+            `).join("")}
+        </div>
+    `;
+}
+
+function updateSavedDevices(devices) {
+    const savedDevicesList = document.getElementById("savedDevicesList");
+    if (!savedDevicesList) return;
+
+    savedDevicesList.innerHTML = `
+        <div class="row mb-3">
+            <div class="col-12">
+                <button class="btn btn-danger" onclick="confirmDeleteAllDevices()">
+                    <i class="fas fa-trash"></i> Delete All Devices
+                </button>
+            </div>
+        </div>
+        <div class="row">
+            ${devices.map(device => `
+                <div class="col-md-4 mb-3">
+                    <div class="card">
+                        <div class="card-body">
+                            <h5 class="card-title">${device.name || device.ip}</h5>
+                            <p class="card-text">
+                                <strong>IP:</strong> ${device.ip}<br>
+                                <strong>MAC:</strong> ${device.mac}<br>
+                                <strong>Type:</strong> ${device.system || 'Not Set'}<br>
+                                <strong>Notes:</strong> ${device.notes || 'None'}
+                            </p>
+                            <div class="btn-group">
+                                <button class="btn btn-primary btn-sm" onclick="editDevice('${device.id}')">
+                                    <i class="fas fa-edit"></i> Edit
+                                </button>
+                                <button class="btn btn-danger btn-sm" onclick="confirmDeleteDevice('${device.id}')">
+                                    <i class="fas fa-trash"></i> Delete
                                 </button>
                             </div>
                         </div>
                     </div>
-                `).join("")}`;
-            
-            // Close the modal
-            bootstrap.Modal.getInstance(document.getElementById("scanModal")).hide();
-        } else {
-            showAlert(`Scan failed: ${response.message}`, "danger");
-        }
-    } catch (error) {
-        showAlert(`Error scanning network: ${error.message}`, "danger");
-    }
+                </div>
+            `).join("")}
+        </div>
+    `;
+}
+
+// Add these new functions for delete functionality
+window.confirmDeleteDevice = function(deviceId) {
+    const modal = document.createElement("div");
+    modal.className = "modal fade";
+    modal.id = "deleteDeviceModal";
+    modal.setAttribute("tabindex", "-1");
+    modal.innerHTML = `
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Confirm Delete</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Are you sure you want to delete this device? This action cannot be undone.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-danger" onclick="deleteDevice('${deviceId}')">Delete</button>
+                </div>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+    const modalInstance = new bootstrap.Modal(modal);
+    modalInstance.show();
+
+    modal.addEventListener("hidden.bs.modal", () => {
+        document.body.removeChild(modal);
+    });
 };
 
-window.saveDevice = async function(ip, mac) {
-    if (!currentCustomerId) {
-        showAlert("No customer selected", "danger");
-        return;
-    }
+window.confirmDeleteAllDevices = function() {
+    const modal = document.createElement("div");
+    modal.className = "modal fade";
+    modal.id = "deleteAllDevicesModal";
+    modal.setAttribute("tabindex", "-1");
+    modal.innerHTML = `
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Confirm Delete All</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Are you sure you want to delete ALL devices? This action cannot be undone.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-danger" onclick="deleteAllDevices()">Delete All</button>
+                </div>
+            </div>
+        </div>
+    `;
 
+    document.body.appendChild(modal);
+    const modalInstance = new bootstrap.Modal(modal);
+    modalInstance.show();
+
+    modal.addEventListener("hidden.bs.modal", () => {
+        document.body.removeChild(modal);
+    });
+};
+
+window.deleteDevice = async function(deviceId) {
     try {
-        const response = await ipcRenderer.invoke("save-device", {
-            ip,
-            mac,
-            type: "network",
-            customerId: currentCustomerId
-        });
-
+        const response = await ipcRenderer.invoke("delete-device", deviceId);
         if (response.status === "success") {
-            showAlert("Device saved successfully", "success");
+            showAlert("Device deleted successfully", "success");
+            const modal = document.getElementById("deleteDeviceModal");
+            if (modal) {
+                const modalInstance = bootstrap.Modal.getInstance(modal);
+                if (modalInstance) {
+                    modalInstance.hide();
+                }
+                modal.addEventListener("hidden.bs.modal", () => {
+                    document.body.removeChild(modal);
+                });
+            }
             loadSavedDevices(currentCustomerId);
         } else {
-            showAlert(`Failed to save device: ${response.message}`, "danger");
+            showAlert(`Failed to delete device: ${response.message}`, "error");
         }
     } catch (error) {
-        showAlert(`Error saving device: ${error.message}`, "danger");
+        showAlert(`Error: ${error.message}`, "error");
     }
 };
 
-window.saveAllDevices = async function() {
-    if (!currentCustomerId) {
-        showAlert("No customer selected", "danger");
-        return;
-    }
-
-    const devices = Array.from(document.querySelectorAll("#devicesList .card")).map(card => ({
-        ip: card.querySelector(".card-title").textContent,
-        mac: card.querySelector(".card-text").textContent.match(/MAC:\s*([^\n]+)/)[1]
-    }));
-
-    let successCount = 0;
-    let errorCount = 0;
-
-    for (const device of devices) {
-        try {
-            const response = await ipcRenderer.invoke("save-device", {
-                ip: device.ip,
-                mac: device.mac,
-                type: "network",
-                customerId: currentCustomerId
-            });
-
-            if (response.status === "success") {
-                successCount++;
-            } else {
-                errorCount++;
-            }
-        } catch (error) {
-            errorCount++;
+window.deleteAllDevices = async function() {
+    try {
+        const response = await ipcRenderer.invoke("delete-all-devices", currentCustomerId);
+        if (response.status === "success") {
+            showAlert("All devices deleted successfully", "success");
+            bootstrap.Modal.getInstance(document.getElementById("deleteAllDevicesModal")).hide();
+            loadSavedDevices(currentCustomerId);
+        } else {
+            showAlert(`Failed to delete devices: ${response.message}`, "error");
         }
-    }
-
-    if (successCount > 0) {
-        showAlert(`Successfully saved ${successCount} device(s)`, "success");
-        loadSavedDevices(currentCustomerId);
-    }
-    if (errorCount > 0) {
-        showAlert(`Failed to save ${errorCount} device(s)`, "warning");
+    } catch (error) {
+        showAlert(`Error: ${error.message}`, "error");
     }
 };
 

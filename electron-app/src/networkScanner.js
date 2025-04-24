@@ -1,27 +1,178 @@
 const nmap = require("node-nmap");
 const ping = require("ping");
+const os = require("os");
+const network = require("network");
+const { exec } = require('child_process');
 
 class NetworkScanner {
     constructor() {
         this.scanResults = [];
+        this.scanTimeout = 30000; // 30 seconds timeout
     }
 
-    async scanNetwork(range) {
-        return new Promise((resolve, reject) => {
+    async detectLocalNetwork() {
+        return new Promise(async (resolve, reject) => {
             try {
+                // Try multiple methods to detect the network
+                const methods = [
+                    this.detectViaNetworkModule.bind(this),
+                    this.detectViaOsModule.bind(this),
+                    this.detectViaIfconfig.bind(this)
+                ];
+
+                for (const method of methods) {
+                    try {
+                        const range = await method();
+                        if (range) {
+                            console.log(`Network detected using ${method.name}: ${range}`);
+                            resolve(range);
+                            return;
+                        }
+                    } catch (error) {
+                        console.warn(`Method ${method.name} failed:`, error);
+                    }
+                }
+
+                // If all methods fail, use fallback range
+                console.log('All detection methods failed, using fallback range');
+                resolve("192.168.1.0/24");
+            } catch (error) {
+                console.error('Error in detectLocalNetwork:', error);
+                resolve("192.168.1.0/24");
+            }
+        });
+    }
+
+    async detectViaNetworkModule() {
+        return new Promise((resolve, reject) => {
+            network.get_gateway_ip((err, gateway) => {
+                if (err) {
+                    reject(err);
+                    return;
+                }
+
+                const interfaces = os.networkInterfaces();
+                for (const name of Object.keys(interfaces)) {
+                    for (const iface of interfaces[name]) {
+                        if (iface.family === 'IPv4' && !iface.internal) {
+                            const ipParts = iface.address.split('.');
+                            const gatewayParts = gateway.split('.');
+                            
+                            if (ipParts[0] === gatewayParts[0] && 
+                                ipParts[1] === gatewayParts[1] && 
+                                ipParts[2] === gatewayParts[2]) {
+                                const cidr = this.subnetMaskToCidr(iface.netmask);
+                                resolve(`${iface.address}/${cidr}`);
+                                return;
+                            }
+                        }
+                    }
+                }
+                reject(new Error('No matching interface found'));
+            });
+        });
+    }
+
+    async detectViaOsModule() {
+        const interfaces = os.networkInterfaces();
+        for (const name of Object.keys(interfaces)) {
+            for (const iface of interfaces[name]) {
+                if (iface.family === 'IPv4' && !iface.internal) {
+                    // Check if it's a private IP address
+                    const ipParts = iface.address.split('.');
+                    if (ipParts[0] === '192' || ipParts[0] === '10' || 
+                        (ipParts[0] === '172' && parseInt(ipParts[1]) >= 16 && parseInt(ipParts[1]) <= 31)) {
+                        const cidr = this.subnetMaskToCidr(iface.netmask);
+                        return `${iface.address}/${cidr}`;
+                    }
+                }
+            }
+        }
+        throw new Error('No private network interface found');
+    }
+
+    async detectViaIfconfig() {
+        return new Promise((resolve, reject) => {
+            exec('ifconfig', (error, stdout, stderr) => {
+                if (error) {
+                    reject(error);
+                    return;
+                }
+
+                const lines = stdout.split('\n');
+                let currentInterface = null;
+                let ip = null;
+                let netmask = null;
+
+                for (const line of lines) {
+                    if (line.includes('flags=')) {
+                        currentInterface = line.split(':')[0];
+                    } else if (currentInterface && line.includes('inet ')) {
+                        const parts = line.trim().split(/\s+/);
+                        ip = parts[1];
+                        netmask = parts[3];
+                        
+                        // Check if it's a private IP
+                        const ipParts = ip.split('.');
+                        if (ipParts[0] === '192' || ipParts[0] === '10' || 
+                            (ipParts[0] === '172' && parseInt(ipParts[1]) >= 16 && parseInt(ipParts[1]) <= 31)) {
+                            const cidr = this.subnetMaskToCidr(netmask);
+                            resolve(`${ip}/${cidr}`);
+                            return;
+                        }
+                    }
+                }
+                reject(new Error('No private network found in ifconfig output'));
+            });
+        });
+    }
+
+    subnetMaskToCidr(subnetMask) {
+        return subnetMask.split('.')
+            .map(octet => (octet >>> 0).toString(2).split('1').length - 1)
+            .reduce((a, b) => a + b);
+    }
+
+    async scanNetwork(range = null) {
+        return new Promise(async (resolve, reject) => {
+            try {
+                // If no range provided, try to detect it
+                if (!range) {
+                    try {
+                        range = await this.detectLocalNetwork();
+                        console.log(`Detected network range: ${range}`);
+                    } catch (error) {
+                        console.warn(`Failed to detect network range: ${error.message}`);
+                        // Fallback to common local network range
+                        range = "192.168.1.0/24";
+                        console.log(`Using fallback range: ${range}`);
+                    }
+                }
+
+                // Set up timeout
+                const timeoutId = setTimeout(() => {
+                    reject(new Error('Scan timed out after 30 seconds'));
+                }, this.scanTimeout);
+
                 const quickscan = new nmap.QuickScan(range);
                 
                 quickscan.on("complete", (data) => {
+                    clearTimeout(timeoutId);
+                    console.log('Scan completed, found devices:', data.length);
                     this.scanResults = data;
                     resolve(this.processResults(data));
                 });
 
                 quickscan.on("error", (error) => {
+                    clearTimeout(timeoutId);
+                    console.error('Scan error:', error);
                     reject(new Error(`Scan failed: ${error.message}`));
                 });
 
+                console.log('Starting scan with range:', range);
                 quickscan.startScan();
             } catch (error) {
+                console.error('Scan initialization error:', error);
                 reject(new Error(`Failed to initialize scan: ${error.message}`));
             }
         });
