@@ -1,5 +1,5 @@
-const nmap = require('node-nmap');
-const ping = require('ping');
+const nmap = require("node-nmap");
+const ping = require("ping");
 
 class NetworkScanner {
     constructor() {
@@ -11,12 +11,12 @@ class NetworkScanner {
             try {
                 const quickscan = new nmap.QuickScan(range);
                 
-                quickscan.on('complete', (data) => {
+                quickscan.on("complete", (data) => {
                     this.scanResults = data;
                     resolve(this.processResults(data));
                 });
 
-                quickscan.on('error', (error) => {
+                quickscan.on("error", (error) => {
                     reject(new Error(`Scan failed: ${error.message}`));
                 });
 
@@ -30,10 +30,10 @@ class NetworkScanner {
     processResults(results) {
         return results.map(host => ({
             ip: host.ip,
-            hostname: host.hostname || 'Unknown',
-            mac: host.mac || 'Unknown',
+            hostname: host.hostname || "Unknown",
+            mac: host.mac || "Unknown",
             openPorts: host.openPorts || [],
-            os: host.os || 'Unknown',
+            os: host.os || "Unknown",
             lastSeen: new Date().toISOString()
         }));
     }
@@ -42,7 +42,7 @@ class NetworkScanner {
         try {
             const result = await ping.promise.probe(ip, {
                 timeout: 10,
-                extra: ['-c', '1']
+                extra: ["-c", "1"]
             });
             
             return {
