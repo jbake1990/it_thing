@@ -308,4 +308,47 @@ ipcMain.handle("delete-all-devices", async (event, customerId) => {
     } catch (error) {
         return { status: "error", message: error.response?.data?.message || error.message };
     }
+});
+
+// Update device handler
+ipcMain.handle("update-device", async (event, { deviceId, name, location, system, notes }) => {
+    const settings = store.get("settings");
+    if (!settings.apiEndpoint || !settings.apiKey) {
+        return { status: "error", message: "API settings not configured" };
+    }
+
+    try {
+        const response = await axios.put(`${settings.apiEndpoint}/devices/${deviceId}`, {
+            name,
+            location,
+            system,
+            notes
+        }, {
+            headers: {
+                "Authorization": `Bearer ${settings.apiKey}`
+            }
+        });
+        return { status: "success", data: response.data };
+    } catch (error) {
+        return { status: "error", message: error.response?.data?.message || error.message };
+    }
+});
+
+// Get device handler
+ipcMain.handle("get-device", async (event, deviceId) => {
+    const settings = store.get("settings");
+    if (!settings.apiEndpoint || !settings.apiKey) {
+        return { status: "error", message: "API settings not configured" };
+    }
+
+    try {
+        const response = await axios.get(`${settings.apiEndpoint}/devices/${deviceId}`, {
+            headers: {
+                "Authorization": `Bearer ${settings.apiKey}`
+            }
+        });
+        return { status: "success", data: response.data };
+    } catch (error) {
+        return { status: "error", message: error.response?.data?.message || error.message };
+    }
 }); 

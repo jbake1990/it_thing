@@ -267,6 +267,48 @@ window.viewCustomer = function(customerId) {
                 </div>
             </div>
         </div>
+
+        <!-- Edit Device Modal -->
+        <div class="modal fade" id="editDeviceModal" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Edit Device</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="editDeviceForm">
+                            <div class="mb-3">
+                                <label class="form-label">Name</label>
+                                <input type="text" class="form-control" id="editDeviceName" required>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Location</label>
+                                <input type="text" class="form-control" id="editDeviceLocation">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">System Type</label>
+                                <select class="form-select" id="editDeviceSystem" required>
+                                    <option value="Networking">Networking</option>
+                                    <option value="CCTV">CCTV</option>
+                                    <option value="Control">Control</option>
+                                    <option value="A/V">A/V</option>
+                                    <option value="Other">Other</option>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Notes</label>
+                                <textarea class="form-control" id="editDeviceNotes" rows="3"></textarea>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="button" class="btn btn-primary" onclick="saveDeviceChanges()">Save Changes</button>
+                    </div>
+                </div>
+            </div>
+        </div>
     `;
 
     // Load customer details and related data
@@ -1049,6 +1091,66 @@ window.saveAllDevices = async function() {
         }
     } catch (error) {
         showAlert(`Error saving devices: ${error.message}`, "error");
+    }
+};
+
+window.editDevice = async function(deviceId) {
+    try {
+        const response = await ipcRenderer.invoke("get-device", deviceId);
+        if (response.status === "success") {
+            const device = response.data;
+            
+            // Set form values
+            const nameInput = document.getElementById("editDeviceName");
+            const locationInput = document.getElementById("editDeviceLocation");
+            const systemInput = document.getElementById("editDeviceSystem");
+            const notesInput = document.getElementById("editDeviceNotes");
+            const form = document.getElementById("editDeviceForm");
+            
+            if (nameInput && locationInput && systemInput && notesInput && form) {
+                nameInput.value = device.name || "";
+                locationInput.value = device.location || "";
+                systemInput.value = device.system || "Networking";
+                notesInput.value = device.notes || "";
+                form.dataset.deviceId = deviceId;
+                
+                // Show modal
+                const modal = new bootstrap.Modal(document.getElementById("editDeviceModal"));
+                modal.show();
+            } else {
+                showAlert("Error: Could not find edit form elements", "danger");
+            }
+        } else {
+            showAlert(`Error loading device: ${response.message}`, "danger");
+        }
+    } catch (error) {
+        showAlert(`Error: ${error.message}`, "danger");
+    }
+};
+
+window.saveDeviceChanges = async function() {
+    const form = document.getElementById("editDeviceForm");
+    const deviceId = form.dataset.deviceId;
+    
+    const deviceData = {
+        name: document.getElementById("editDeviceName").value,
+        location: document.getElementById("editDeviceLocation").value,
+        system: document.getElementById("editDeviceSystem").value,
+        notes: document.getElementById("editDeviceNotes").value
+    };
+    
+    try {
+        const response = await ipcRenderer.invoke("update-device", { deviceId, ...deviceData });
+        if (response.status === "success") {
+            showAlert("Device updated successfully", "success");
+            const modal = bootstrap.Modal.getInstance(document.getElementById("editDeviceModal"));
+            modal.hide();
+            loadSavedDevices(currentCustomerId);
+        } else {
+            showAlert(`Failed to update device: ${response.message}`, "danger");
+        }
+    } catch (error) {
+        showAlert(`Error: ${error.message}`, "danger");
     }
 };
 

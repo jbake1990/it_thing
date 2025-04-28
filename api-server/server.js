@@ -236,6 +236,18 @@ app.get('/api/devices', authenticateToken, async (req, res) => {
   }
 });
 
+app.get('/api/devices/:id', authenticateToken, async (req, res) => {
+  try {
+    const device = await Device.findByPk(req.params.id);
+    if (!device) {
+      return res.status(404).json({ message: 'Device not found' });
+    }
+    res.json(device);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
 app.post('/api/devices', authenticateToken, async (req, res) => {
   try {
     const { customerId, customer_id, ...deviceData } = req.body;
@@ -259,6 +271,20 @@ app.delete('/api/devices/:id', authenticateToken, async (req, res) => {
     res.status(204).send();
   } catch (error) {
     res.status(500).json({ message: error.message });
+  }
+});
+
+// Add PUT endpoint for updating devices
+app.put('/api/devices/:id', authenticateToken, async (req, res) => {
+  try {
+    const device = await Device.findByPk(req.params.id);
+    if (!device) {
+      return res.status(404).json({ message: 'Device not found' });
+    }
+    await device.update(req.body);
+    res.json(device);
+  } catch (error) {
+    res.status(400).json({ message: error.message });
   }
 });
 
