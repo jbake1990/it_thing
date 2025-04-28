@@ -19,8 +19,10 @@
             width: 250px;
         }
         .main-content {
-            padding: 20px;
+            padding: 2rem;
             margin-left: 250px;
+            max-width: calc(100vw - 250px);
+            overflow-x: hidden;
         }
         .nav-link {
             color: rgba(255,255,255,.8);
@@ -71,6 +73,53 @@
         }
         .input-group:focus-within {
             box-shadow: 0 0 0 0.2rem rgba(0,123,255,.25);
+        }
+        /* Custom tab styling */
+        .nav-tabs {
+            border-bottom: 1px solid #dee2e6;
+            margin-bottom: 1.5rem;
+        }
+        .nav-tabs .nav-link {
+            color: #495057;
+            background-color: #e9ecef;
+            border: 1px solid #dee2e6;
+            border-bottom: none;
+            margin-right: 5px;
+            border-radius: 4px 4px 0 0;
+            padding: 10px 20px;
+        }
+        .nav-tabs .nav-link:hover {
+            background-color: #dee2e6;
+            border-color: #dee2e6;
+            color: #212529;
+        }
+        .nav-tabs .nav-link.active {
+            color: #0d6efd;
+            background-color: #fff;
+            border-color: #dee2e6 #dee2e6 #fff;
+            font-weight: 500;
+        }
+        /* Responsive layout adjustments */
+        @media (max-width: 768px) {
+            .sidebar {
+                width: 100%;
+                height: auto;
+                position: relative;
+            }
+            .main-content {
+                margin-left: 0;
+                max-width: 100%;
+                padding: 1rem;
+            }
+        }
+        .container-fluid {
+            padding-right: 0;
+            padding-left: 0;
+        }
+        #content {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 0 1rem;
         }
     </style>
 </head>
