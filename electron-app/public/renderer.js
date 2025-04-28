@@ -982,6 +982,15 @@ window.saveDevice = async function(ip, mac) {
 
         if (response.status === "success") {
             showAlert("Device saved successfully", "success");
+            // Remove the saved device from the scan results
+            const deviceCards = document.querySelectorAll('.card-title');
+            for (const card of deviceCards) {
+                if (card.textContent === ip) {
+                    card.closest('.col-md-4').remove();
+                    break;
+                }
+            }
+            // Update saved devices list
             loadSavedDevices(currentCustomerId);
         } else {
             showAlert(`Failed to save device: ${response.message}`, "error");
@@ -1018,6 +1027,14 @@ window.saveAllDevices = async function() {
 
             if (response.status === "success") {
                 successCount++;
+                // Remove the saved device from the scan results
+                const deviceCards = document.querySelectorAll('.card-title');
+                for (const card of deviceCards) {
+                    if (card.textContent === device.ip) {
+                        card.closest('.col-md-4').remove();
+                        break;
+                    }
+                }
             } else {
                 errorCount++;
             }
