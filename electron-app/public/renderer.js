@@ -971,6 +971,70 @@ async function runSpeedTest() {
     }
 }
 
+window.saveDevice = async function(ip, mac) {
+    try {
+        const response = await ipcRenderer.invoke("save-device", {
+            ip,
+            mac,
+            type: "network",
+            customerId: currentCustomerId
+        });
+
+        if (response.status === "success") {
+            showAlert("Device saved successfully", "success");
+            loadSavedDevices(currentCustomerId);
+        } else {
+            showAlert(`Failed to save device: ${response.message}`, "error");
+        }
+    } catch (error) {
+        showAlert(`Error saving device: ${error.message}`, "error");
+    }
+};
+
+window.saveAllDevices = async function() {
+    const devicesList = document.getElementById("devicesList");
+    const devices = Array.from(devicesList.querySelectorAll(".card")).map(card => {
+        const ip = card.querySelector(".card-title").textContent;
+        const mac = card.querySelector(".card-text").textContent.match(/MAC:\s*([^\n]+)/)[1].trim();
+        return { ip, mac };
+    });
+
+    if (devices.length === 0) {
+        showAlert("No devices to save", "warning");
+        return;
+    }
+
+    try {
+        let successCount = 0;
+        let errorCount = 0;
+
+        for (const device of devices) {
+            const response = await ipcRenderer.invoke("save-device", {
+                ip: device.ip,
+                mac: device.mac,
+                type: "network",
+                customerId: currentCustomerId
+            });
+
+            if (response.status === "success") {
+                successCount++;
+            } else {
+                errorCount++;
+            }
+        }
+
+        if (successCount > 0) {
+            showAlert(`Successfully saved ${successCount} device(s)`, "success");
+            loadSavedDevices(currentCustomerId);
+        }
+        if (errorCount > 0) {
+            showAlert(`Failed to save ${errorCount} device(s)`, "error");
+        }
+    } catch (error) {
+        showAlert(`Error saving devices: ${error.message}`, "error");
+    }
+};
+
 // Initialize the application
 document.addEventListener("DOMContentLoaded", function() {
     loadPage("dashboard");

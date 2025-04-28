@@ -257,7 +257,9 @@ ipcMain.handle("save-device", async (event, { ip, mac, type, customerId }) => {
             ip,
             mac,
             type,
-            customerId
+            customerId,
+            name: `Device ${ip}`,
+            notes: "Added from network scan"
         }, {
             headers: {
                 "Authorization": `Bearer ${settings.apiKey}`
