@@ -175,19 +175,11 @@ class NetworkScanner {
                     '-sn',           // Ping scan (no port scan)
                     '-PR',           // ARP ping
                     '-n',            // No DNS resolution
-                    '--send-eth',    // Send raw ethernet frames
-                    '--send-ip',     // Send IP packets
                     '--min-rtt-timeout', '100ms',  // Minimum RTT timeout
                     '--max-rtt-timeout', '1000ms', // Maximum RTT timeout
                     '--initial-rtt-timeout', '500ms', // Initial RTT timeout
                     '--max-retries', '2',  // Maximum retries
-                    '--host-timeout', '5s', // Host timeout
-                    '--min-rate', '100',    // Minimum packet rate
-                    '--max-rate', '1000',   // Maximum packet rate
-                    '--packet-trace',       // Show packets sent/received
-                    '--reason',             // Show reason for host state
-                    '--append-output',      // Append to output file
-                    '--log-errors'          // Log errors
+                    '--host-timeout', '5s' // Host timeout
                 ]);
                 
                 scan.on("complete", (data) => {
