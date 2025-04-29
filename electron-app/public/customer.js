@@ -128,8 +128,22 @@ function createSavedDeviceCard(device) {
                 <p class="card-text">
                     <strong>IP:</strong> ${device.ip}<br>
                     <strong>MAC:</strong> ${device.mac}<br>
-                    <strong>Last Seen:</strong> ${new Date(device.lastSeen).toLocaleString()}
+                    <strong>Last Seen:</strong> ${new Date(device.lastSeen).toLocaleString()}<br>
+                    <strong>Login:</strong> ${device.login || 'Not set'}<br>
+                    <strong>Password:</strong> 
+                    <span class="password-field">
+                        <span class="password-text" style="display: none">${device.password || 'Not set'}</span>
+                        <span class="password-dots">${device.password ? '••••••••' : 'Not set'}</span>
+                        ${device.password ? `
+                            <button class="btn btn-link btn-sm p-0 ms-1" onclick="toggleCardPassword(this)">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        ` : ''}
+                    </span>
                 </p>
+                <button class="btn btn-primary btn-sm" onclick="editDevice('${device.id}')">
+                    Edit
+                </button>
                 <button class="btn btn-danger btn-sm" onclick="deleteDevice('${device.id}')">
                     Delete
                 </button>
@@ -137,6 +151,25 @@ function createSavedDeviceCard(device) {
         </div>
     `;
     return card;
+}
+
+function toggleCardPassword(button) {
+    const passwordField = button.closest('.password-field');
+    const passwordText = passwordField.querySelector('.password-text');
+    const passwordDots = passwordField.querySelector('.password-dots');
+    const icon = button.querySelector('i');
+    
+    if (passwordText.style.display === 'none') {
+        passwordText.style.display = 'inline';
+        passwordDots.style.display = 'none';
+        icon.classList.remove('fa-eye');
+        icon.classList.add('fa-eye-slash');
+    } else {
+        passwordText.style.display = 'none';
+        passwordDots.style.display = 'inline';
+        icon.classList.remove('fa-eye-slash');
+        icon.classList.add('fa-eye');
+    }
 }
 
 // CCTV Functions
@@ -202,3 +235,32 @@ function createCCTVDeviceCard(device) {
     const card = document.createElement("div");
     card.className = "col-md-4 device-card";
     card.innerHTML = `
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title"><strong>${device.name || 'Unnamed Device'}</strong></h5>
+                <p class="card-text">
+                    <strong>IP:</strong> ${device.ip}<br>
+                    <strong>Model:</strong> ${device.model}<br>
+                    <strong>Username:</strong> ${device.username}<br>
+                    <strong>Password:</strong> 
+                    <span class="password-field">
+                        <span class="password-text" style="display: none">${device.password || 'Not set'}</span>
+                        <span class="password-dots">${device.password ? '••••••••' : 'Not set'}</span>
+                        ${device.password ? `
+                            <button class="btn btn-link btn-sm p-0 ms-1" onclick="toggleCardPassword(this)">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        ` : ''}
+                    </span>
+                </p>
+                <button class="btn btn-primary btn-sm" onclick="editCCTVDevice('${device.id}')">
+                    Edit
+                </button>
+                <button class="btn btn-danger btn-sm" onclick="deleteCCTVDevice('${device.id}')">
+                    Delete
+                </button>
+            </div>
+        </div>
+    `;
+    return card;
+}

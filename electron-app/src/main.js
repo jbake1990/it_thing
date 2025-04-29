@@ -312,7 +312,7 @@ ipcMain.handle("delete-all-devices", async (event, customerId) => {
 });
 
 // Update device handler
-ipcMain.handle("update-device", async (event, { deviceId, name, location, system, notes }) => {
+ipcMain.handle("update-device", async (event, { deviceId, name, location, system, notes, login, password }) => {
     const settings = store.get("settings");
     if (!settings.apiEndpoint || !settings.apiKey) {
         return { status: "error", message: "API settings not configured" };
@@ -323,7 +323,9 @@ ipcMain.handle("update-device", async (event, { deviceId, name, location, system
             name,
             location,
             system,
-            notes
+            notes,
+            login,
+            password
         }, {
             headers: {
                 "Authorization": `Bearer ${settings.apiKey}`

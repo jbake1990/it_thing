@@ -58,7 +58,15 @@ const Device = sequelize.define('Device', {
   },
   location: DataTypes.STRING,
   system: DataTypes.STRING,
-  notes: DataTypes.TEXT
+  notes: DataTypes.TEXT,
+  login: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+  password: {
+    type: DataTypes.STRING,
+    allowNull: true
+  }
 });
 
 const CCTVDevice = sequelize.define('CCTVDevice', {
@@ -259,7 +267,7 @@ app.get('/api/devices/:id', authenticateToken, async (req, res) => {
 
 app.post('/api/devices', authenticateToken, async (req, res) => {
   try {
-    const { customerId, customer_id, ip, mac, type, location, system, notes } = req.body;
+    const { customerId, customer_id, ip, mac, type, location, system, notes, login, password } = req.body;
     
     if (!ip || !mac || !type || !(customerId || customer_id)) {
       return res.status(400).json({ message: 'Missing required fields' });
@@ -272,7 +280,9 @@ app.post('/api/devices', authenticateToken, async (req, res) => {
       type,
       location: location || null,
       system: system || 'Other',
-      notes: notes || null
+      notes: notes || null,
+      login: login || null,
+      password: password || null
     });
 
     res.status(201).json(device);

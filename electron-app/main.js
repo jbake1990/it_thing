@@ -1,6 +1,7 @@
 const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
 const axios = require('axios');
+const store = require('electron-store');
 
 // API configuration
 const API_BASE_URL = 'http://localhost:3002/api';
@@ -46,16 +47,28 @@ ipcMain.handle("get-device", async (event, deviceId) => {
     }
 });
 
-// Update device
-ipcMain.handle("update-device", async (event, { deviceId, name, system, notes }) => {
+// Update device handler
+ipcMain.handle("update-device", async (event, { deviceId, name, location, system, notes, login, password }) => {
+    const settings = store.get("settings");
+    if (!settings.apiEndpoint || !settings.apiKey) {
+        return { status: "error", message: "API settings not configured" };
+    }
+
     try {
-        const response = await axios.put(`${API_BASE_URL}/devices/${deviceId}`, {
+        const response = await axios.put(`${settings.apiEndpoint}/devices/${deviceId}`, {
             name,
+            location,
             system,
-            notes
+            notes,
+            login,
+            password
+        }, {
+            headers: {
+                "Authorization": `Bearer ${settings.apiKey}`
+            }
         });
         return { status: "success", data: response.data };
     } catch (error) {
-        return { status: "error", message: error.message };
+        return { status: "error", message: error.response?.data?.message || error.message };
     }
 }); 

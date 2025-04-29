@@ -297,6 +297,19 @@ window.viewCustomer = function(customerId) {
                                 </select>
                             </div>
                             <div class="mb-3">
+                                <label class="form-label">Login</label>
+                                <input type="text" class="form-control" id="editDeviceLogin">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Password</label>
+                                <div class="input-group">
+                                    <input type="text" class="form-control" id="editDevicePassword">
+                                    <button type="button" class="btn btn-outline-secondary toggle-password" onclick="togglePasswordVisibility(this)">
+                                        <i class="fas fa-eye-slash"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="mb-3">
                                 <label class="form-label">Notes</label>
                                 <textarea class="form-control" id="editDeviceNotes" rows="3"></textarea>
                             </div>
@@ -304,7 +317,7 @@ window.viewCustomer = function(customerId) {
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                        <button type="button" class="btn btn-primary" onclick="saveDeviceChanges()">Save Changes</button>
+                        <button type="button" class="btn btn-primary" onclick="updateDevice()">Save Changes</button>
                     </div>
                 </div>
             </div>
@@ -836,6 +849,17 @@ function updateSavedDevices(devices) {
                                 <strong>IP:</strong> ${device.ip}<br>
                                 <strong>MAC:</strong> ${device.mac}<br>
                                 <strong>Type:</strong> ${device.system || 'Not Set'}<br>
+                                <strong>Login:</strong> ${device.login || 'Not set'}<br>
+                                <strong>Password:</strong> 
+                                <span class="password-field">
+                                    <span class="password-text" style="display: none">${device.password || 'Not set'}</span>
+                                    <span class="password-dots">${device.password ? '••••••••' : 'Not set'}</span>
+                                    ${device.password ? `
+                                        <button class="btn btn-link btn-sm p-0 ms-1" onclick="toggleCardPassword(this)">
+                                            <i class="fas fa-eye"></i>
+                                        </button>
+                                    ` : ''}
+                                </span><br>
                                 <strong>Notes:</strong> ${device.notes || 'None'}
                             </p>
                             <div class="btn-group">
@@ -1094,51 +1118,78 @@ window.saveAllDevices = async function() {
     }
 };
 
-window.editDevice = async function(deviceId) {
+async function editDevice(deviceId) {
     try {
         const response = await ipcRenderer.invoke("get-device", deviceId);
         if (response.status === "success") {
             const device = response.data;
             
             // Set form values
-            const nameInput = document.getElementById("editDeviceName");
-            const locationInput = document.getElementById("editDeviceLocation");
-            const systemInput = document.getElementById("editDeviceSystem");
-            const notesInput = document.getElementById("editDeviceNotes");
-            const form = document.getElementById("editDeviceForm");
+            document.getElementById("editDeviceName").value = device.name || "";
+            document.getElementById("editDeviceLocation").value = device.location || "";
+            document.getElementById("editDeviceSystem").value = device.system || "Networking";
+            document.getElementById("editDeviceLogin").value = device.login || "";
+            document.getElementById("editDevicePassword").value = device.password || "";
+            document.getElementById("editDeviceNotes").value = device.notes || "";
             
-            if (nameInput && locationInput && systemInput && notesInput && form) {
-                nameInput.value = device.name || "";
-                locationInput.value = device.location || "";
-                systemInput.value = device.system || "Networking";
-                notesInput.value = device.notes || "";
-                form.dataset.deviceId = deviceId;
-                
-                // Show modal
-                const modal = new bootstrap.Modal(document.getElementById("editDeviceModal"));
-                modal.show();
-            } else {
-                showAlert("Error: Could not find edit form elements", "danger");
+            // Store device ID for update
+            document.getElementById("editDeviceForm").dataset.deviceId = deviceId;
+            
+            // Initialize password toggle button
+            const toggleButton = document.querySelector('.toggle-password i');
+            if (toggleButton) {
+                toggleButton.classList.remove('fa-eye-slash');
+                toggleButton.classList.add('fa-eye');
             }
+            
+            // Show modal
+            const modal = new bootstrap.Modal(document.getElementById("editDeviceModal"));
+            modal.show();
         } else {
-            showAlert(`Error loading device: ${response.message}`, "danger");
+            showAlert(`Failed to load device: ${response.message}`, "danger");
         }
     } catch (error) {
         showAlert(`Error: ${error.message}`, "danger");
     }
+}
+
+window.togglePasswordVisibility = function(buttonElement) {
+    const passwordInput = buttonElement.previousElementSibling;
+    const icon = buttonElement.querySelector('i');
+    
+    if (passwordInput.type === 'text') {
+        passwordInput.type = 'password';
+        icon.classList.remove('fa-eye-slash');
+        icon.classList.add('fa-eye');
+    } else {
+        passwordInput.type = 'text';
+        icon.classList.remove('fa-eye');
+        icon.classList.add('fa-eye-slash');
+    }
 };
 
-window.saveDeviceChanges = async function() {
+window.updateDevice = async function() {
     const form = document.getElementById("editDeviceForm");
+    if (!form) {
+        showAlert("Error: Could not find edit form", "danger");
+        return;
+    }
+
     const deviceId = form.dataset.deviceId;
-    
+    if (!deviceId) {
+        showAlert("Error: No device ID found", "danger");
+        return;
+    }
+
     const deviceData = {
         name: document.getElementById("editDeviceName").value,
         location: document.getElementById("editDeviceLocation").value,
         system: document.getElementById("editDeviceSystem").value,
-        notes: document.getElementById("editDeviceNotes").value
+        notes: document.getElementById("editDeviceNotes").value,
+        login: document.getElementById("editDeviceLogin").value,
+        password: document.getElementById("editDevicePassword").value
     };
-    
+
     try {
         const response = await ipcRenderer.invoke("update-device", { deviceId, ...deviceData });
         if (response.status === "success") {
@@ -1147,7 +1198,7 @@ window.saveDeviceChanges = async function() {
             modal.hide();
             loadSavedDevices(currentCustomerId);
         } else {
-            showAlert(`Failed to update device: ${response.message}`, "danger");
+            showAlert(`Error updating device: ${response.message}`, "danger");
         }
     } catch (error) {
         showAlert(`Error: ${error.message}`, "danger");
@@ -1157,4 +1208,39 @@ window.saveDeviceChanges = async function() {
 // Initialize the application
 document.addEventListener("DOMContentLoaded", function() {
     loadPage("dashboard");
-}); 
+});
+
+function togglePasswordVisibility() {
+    const passwordInput = document.getElementById('editDevicePassword');
+    const toggleButton = document.querySelector('.toggle-password i');
+    
+    if (passwordInput.type === 'password') {
+        passwordInput.type = 'text';
+        toggleButton.classList.remove('fa-eye');
+        toggleButton.classList.add('fa-eye-slash');
+    } else {
+        passwordInput.type = 'password';
+        toggleButton.classList.remove('fa-eye-slash');
+        toggleButton.classList.add('fa-eye');
+    }
+}
+
+// Add the toggleCardPassword function
+window.toggleCardPassword = function(buttonElement) {
+    const passwordField = buttonElement.closest('.password-field');
+    const passwordText = passwordField.querySelector('.password-text');
+    const passwordDots = passwordField.querySelector('.password-dots');
+    const icon = buttonElement.querySelector('i');
+    
+    if (passwordText.style.display === 'none') {
+        passwordText.style.display = 'inline';
+        passwordDots.style.display = 'none';
+        icon.classList.remove('fa-eye');
+        icon.classList.add('fa-eye-slash');
+    } else {
+        passwordText.style.display = 'none';
+        passwordDots.style.display = 'inline';
+        icon.classList.remove('fa-eye-slash');
+        icon.classList.add('fa-eye');
+    }
+}; 
