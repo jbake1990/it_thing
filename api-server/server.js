@@ -17,6 +17,28 @@ const sequelize = new Sequelize({
   logging: false
 });
 
+// Force sync database
+sequelize.sync({ force: true }).then(async () => {
+  console.log('Database synchronized');
+  
+  // Create default admin user
+  try {
+    const adminUser = await User.findOne({ where: { username: 'admin' } });
+    if (!adminUser) {
+      await User.create({
+        username: 'admin',
+        password_hash: bcrypt.hashSync('admin123', 10),
+        is_admin: true
+      });
+      console.log('Default admin user created');
+    }
+  } catch (error) {
+    console.error('Error creating admin user:', error);
+  }
+}).catch(error => {
+  console.error('Error synchronizing database:', error);
+});
+
 // Define models
 const Customer = sequelize.define('Customer', {
   name: {
@@ -50,7 +72,11 @@ const Device = sequelize.define('Device', {
   last_seen: {
     type: DataTypes.DATE,
     defaultValue: DataTypes.NOW
-  }
+  },
+  name: DataTypes.STRING,
+  location: DataTypes.STRING,
+  system: DataTypes.STRING,
+  notes: DataTypes.TEXT
 });
 
 const CCTVDevice = sequelize.define('CCTVDevice', {
@@ -250,13 +276,27 @@ app.get('/api/devices/:id', authenticateToken, async (req, res) => {
 
 app.post('/api/devices', authenticateToken, async (req, res) => {
   try {
-    const { customerId, customer_id, ...deviceData } = req.body;
+    const { customerId, customer_id, ip, mac, type, name, location, system, notes } = req.body;
+    
+    // Validate required fields
+    if (!ip || !mac || !type || !customerId) {
+      return res.status(400).json({ message: 'Missing required fields' });
+    }
+
     const device = await Device.create({
-      ...deviceData,
-      customer_id: customer_id || customerId
+      customer_id: customer_id || customerId,
+      ip,
+      mac,
+      type,
+      name: name || `Device ${ip}`,
+      location: location || null,
+      system: system || 'Networking',
+      notes: notes || null
     });
+
     res.status(201).json(device);
   } catch (error) {
+    console.error('Error creating device:', error);
     res.status(400).json({ message: error.message });
   }
 });
