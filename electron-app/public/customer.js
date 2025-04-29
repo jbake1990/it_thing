@@ -63,8 +63,9 @@ function createDeviceCard(device) {
     card.innerHTML = `
         <div class="card">
             <div class="card-body">
-                <h5 class="card-title">${device.ip}</h5>
+                <h5 class="card-title"><strong>${device.name || 'Unnamed Device'}</strong></h5>
                 <p class="card-text">
+                    <strong>IP:</strong> ${device.ip}<br>
                     <strong>MAC:</strong> ${device.mac}<br>
                     <strong>Manufacturer:</strong> ${device.manufacturer || "Unknown"}
                 </p>
@@ -123,8 +124,9 @@ function createSavedDeviceCard(device) {
     card.innerHTML = `
         <div class="card">
             <div class="card-body">
-                <h5 class="card-title">${device.ip}</h5>
+                <h5 class="card-title"><strong>${device.name || 'Unnamed Device'}</strong></h5>
                 <p class="card-text">
+                    <strong>IP:</strong> ${device.ip}<br>
                     <strong>MAC:</strong> ${device.mac}<br>
                     <strong>Last Seen:</strong> ${new Date(device.lastSeen).toLocaleString()}
                 </p>
@@ -200,153 +202,3 @@ function createCCTVDeviceCard(device) {
     const card = document.createElement("div");
     card.className = "col-md-4 device-card";
     card.innerHTML = `
-        <div class="card">
-            <div class="card-body">
-                <h5 class="card-title">${device.model}</h5>
-                <p class="card-text">
-                    <strong>IP:</strong> ${device.ip}<br>
-                    <strong>Type:</strong> ${device.type.toUpperCase()}
-                </p>
-                <button class="btn btn-primary btn-sm" onclick="editCCTVDevice('${device.id}')">
-                    Edit
-                </button>
-                <button class="btn btn-danger btn-sm" onclick="deleteCCTVDevice('${device.id}')">
-                    Delete
-                </button>
-            </div>
-        </div>
-    `;
-    return card;
-}
-
-// Password Management Functions
-function addPassword() {
-    const modal = new bootstrap.Modal(document.getElementById("addPasswordModal"));
-    modal.show();
-}
-
-async function savePassword() {
-    const form = document.getElementById("passwordForm");
-    const formData = {
-        customerId,
-        serviceName: document.getElementById("serviceName").value,
-        username: document.getElementById("passwordUsername").value,
-        password: document.getElementById("passwordValue").value,
-        notes: document.getElementById("passwordNotes").value
-    };
-
-    try {
-        const response = await fetch("http://localhost:3000/api/passwords", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify(formData)
-        });
-        if (response.ok) {
-            loadPasswords();
-            bootstrap.Modal.getInstance(document.getElementById("addPasswordModal")).hide();
-            form.reset();
-        }
-    } catch (error) {
-        console.error("Error saving password:", error);
-    }
-}
-
-async function loadPasswords() {
-    try {
-        const response = await fetch(`http://localhost:3000/api/passwords?customerId=${customerId}`);
-        const passwords = await response.json();
-        const passwordsList = document.getElementById("passwordsList");
-        
-        passwordsList.innerHTML = "";
-        passwords.forEach(password => {
-            const passwordItem = createPasswordItem(password);
-            passwordsList.appendChild(passwordItem);
-        });
-    } catch (error) {
-        console.error("Error loading passwords:", error);
-    }
-}
-
-function createPasswordItem(password) {
-    const item = document.createElement("div");
-    item.className = "card password-item";
-    item.innerHTML = `
-        <div class="card-body">
-            <h5 class="card-title">${password.serviceName}</h5>
-            <p class="card-text">
-                <strong>Username:</strong> ${password.username}<br>
-                <strong>Password:</strong> <span class="password-value">••••••••</span>
-                <button class="btn btn-sm btn-outline-secondary" onclick="togglePassword(this)">
-                    Show
-                </button>
-            </p>
-            ${password.notes ? `<p class="card-text"><strong>Notes:</strong> ${password.notes}</p>` : ""}
-            <button class="btn btn-primary btn-sm" onclick="editPassword('${password.id}')">
-                Edit
-            </button>
-            <button class="btn btn-danger btn-sm" onclick="deletePassword('${password.id}')">
-                Delete
-            </button>
-        </div>
-    `;
-    return item;
-}
-
-function togglePassword(button) {
-    const passwordValue = button.previousElementSibling;
-    if (passwordValue.textContent === "••••••••") {
-        passwordValue.textContent = button.dataset.password;
-        button.textContent = "Hide";
-    } else {
-        passwordValue.textContent = "••••••••";
-        button.textContent = "Show";
-    }
-}
-
-// Delete Functions
-async function deleteDevice(id) {
-    if (confirm("Are you sure you want to delete this device?")) {
-        try {
-            const response = await fetch(`http://localhost:3000/api/devices/${id}`, {
-                method: "DELETE"
-            });
-            if (response.ok) {
-                loadSavedDevices();
-            }
-        } catch (error) {
-            console.error("Error deleting device:", error);
-        }
-    }
-}
-
-async function deleteCCTVDevice(id) {
-    if (confirm("Are you sure you want to delete this CCTV device?")) {
-        try {
-            const response = await fetch(`http://localhost:3000/api/cctv/${id}`, {
-                method: "DELETE"
-            });
-            if (response.ok) {
-                loadCCTVDevices();
-            }
-        } catch (error) {
-            console.error("Error deleting CCTV device:", error);
-        }
-    }
-}
-
-async function deletePassword(id) {
-    if (confirm("Are you sure you want to delete this password?")) {
-        try {
-            const response = await fetch(`http://localhost:3000/api/passwords/${id}`, {
-                method: "DELETE"
-            });
-            if (response.ok) {
-                loadPasswords();
-            }
-        } catch (error) {
-            console.error("Error deleting password:", error);
-        }
-    }
-} 

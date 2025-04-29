@@ -149,28 +149,62 @@ class NetworkScanner {
                     }
                 }
 
+                // Ensure range is a string and properly formatted
+                if (typeof range !== 'string') {
+                    range = String(range);
+                }
+
+                // Validate the range format (should be in CIDR notation)
+                if (!range.includes('/')) {
+                    // If no CIDR notation, assume /24 subnet
+                    const ipParts = range.split('.');
+                    if (ipParts.length === 4) {
+                        range = `${ipParts[0]}.${ipParts[1]}.${ipParts[2]}.0/24`;
+                    } else {
+                        throw new Error('Invalid IP range format');
+                    }
+                }
+
                 // Set up timeout
                 const timeoutId = setTimeout(() => {
                     reject(new Error('Scan timed out after 30 seconds'));
                 }, this.scanTimeout);
 
-                const quickscan = new nmap.QuickScan(range);
+                // Create a more detailed scan configuration
+                const scan = new nmap.NmapScan(range, [
+                    '-sn',           // Ping scan (no port scan)
+                    '-PR',           // ARP ping
+                    '-n',            // No DNS resolution
+                    '--send-eth',    // Send raw ethernet frames
+                    '--send-ip',     // Send IP packets
+                    '--min-rtt-timeout', '100ms',  // Minimum RTT timeout
+                    '--max-rtt-timeout', '1000ms', // Maximum RTT timeout
+                    '--initial-rtt-timeout', '500ms', // Initial RTT timeout
+                    '--max-retries', '2',  // Maximum retries
+                    '--host-timeout', '5s', // Host timeout
+                    '--min-rate', '100',    // Minimum packet rate
+                    '--max-rate', '1000',   // Maximum packet rate
+                    '--packet-trace',       // Show packets sent/received
+                    '--reason',             // Show reason for host state
+                    '--append-output',      // Append to output file
+                    '--log-errors'          // Log errors
+                ]);
                 
-                quickscan.on("complete", (data) => {
+                scan.on("complete", (data) => {
                     clearTimeout(timeoutId);
                     console.log('Scan completed, found devices:', data.length);
                     this.scanResults = data;
                     resolve(this.processResults(data));
                 });
 
-                quickscan.on("error", (error) => {
+                scan.on("error", (error) => {
                     clearTimeout(timeoutId);
                     console.error('Scan error:', error);
                     reject(new Error(`Scan failed: ${error.message}`));
                 });
 
-                console.log('Starting scan with range:', range);
-                quickscan.startScan();
+                console.log('Starting advanced scan with range:', range);
+                scan.startScan();
             } catch (error) {
                 console.error('Scan initialization error:', error);
                 reject(new Error(`Failed to initialize scan: ${error.message}`));
@@ -179,14 +213,36 @@ class NetworkScanner {
     }
 
     processResults(results) {
-        return results.map(host => ({
-            ip: host.ip,
-            hostname: host.hostname || "Unknown",
-            mac: host.mac || "Unknown",
-            openPorts: host.openPorts || [],
-            os: host.os || "Unknown",
-            lastSeen: new Date().toISOString()
-        }));
+        return results.map(host => {
+            // Format MAC address if present
+            let mac = "Unknown";
+            if (host.mac) {
+                mac = host.mac.toUpperCase();
+                // Ensure MAC is in standard format (XX:XX:XX:XX:XX:XX)
+                if (!mac.includes(':')) {
+                    mac = mac.match(/.{1,2}/g).join(':');
+                }
+            } else if (host.address && host.address.mac) {
+                mac = host.address.mac.toUpperCase();
+                if (!mac.includes(':')) {
+                    mac = mac.match(/.{1,2}/g).join(':');
+                }
+            }
+
+            return {
+                ip: host.ip,
+                hostname: host.hostname || "Unknown",
+                mac: mac,
+                vendor: host.vendor || "Unknown",
+                openPorts: host.openPorts || [],
+                os: host.os || "Unknown",
+                osDetails: host.osDetails || {},
+                lastSeen: new Date().toISOString(),
+                scanTime: host.scanTime || 0,
+                latency: host.latency || 0,
+                ttl: host.ttl || 0
+            };
+        });
     }
 
     async pingHost(ip) {

@@ -17,28 +17,6 @@ const sequelize = new Sequelize({
   logging: false
 });
 
-// Force sync database
-sequelize.sync({ force: true }).then(async () => {
-  console.log('Database synchronized');
-  
-  // Create default admin user
-  try {
-    const adminUser = await User.findOne({ where: { username: 'admin' } });
-    if (!adminUser) {
-      await User.create({
-        username: 'admin',
-        password_hash: bcrypt.hashSync('admin123', 10),
-        is_admin: true
-      });
-      console.log('Default admin user created');
-    }
-  } catch (error) {
-    console.error('Error creating admin user:', error);
-  }
-}).catch(error => {
-  console.error('Error synchronizing database:', error);
-});
-
 // Define models
 const Customer = sequelize.define('Customer', {
   name: {
@@ -55,6 +33,11 @@ const Device = sequelize.define('Device', {
   customer_id: {
     type: DataTypes.INTEGER,
     allowNull: false
+  },
+  name: {
+    type: DataTypes.STRING,
+    allowNull: false,
+    defaultValue: 'Unnamed Device'
   },
   ip: {
     type: DataTypes.STRING,
@@ -73,7 +56,6 @@ const Device = sequelize.define('Device', {
     type: DataTypes.DATE,
     defaultValue: DataTypes.NOW
   },
-  name: DataTypes.STRING,
   location: DataTypes.STRING,
   system: DataTypes.STRING,
   notes: DataTypes.TEXT
@@ -144,11 +126,7 @@ const User = sequelize.define('User', {
 
 // Set up relationships
 Customer.hasMany(Device, { foreignKey: 'customer_id' });
-Customer.hasMany(CCTVDevice, { foreignKey: 'customer_id' });
-Customer.hasMany(Password, { foreignKey: 'customer_id' });
 Device.belongsTo(Customer, { foreignKey: 'customer_id' });
-CCTVDevice.belongsTo(Customer, { foreignKey: 'customer_id' });
-Password.belongsTo(Customer, { foreignKey: 'customer_id' });
 
 // Authentication middleware
 const authenticateToken = (req, res, next) => {
@@ -187,6 +165,11 @@ app.post('/api/auth/login', async (req, res) => {
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
+});
+
+// Add health check endpoint
+app.get('/api/health', (req, res) => {
+  res.status(200).json({ status: 'ok' });
 });
 
 // Customer endpoints
@@ -276,10 +259,9 @@ app.get('/api/devices/:id', authenticateToken, async (req, res) => {
 
 app.post('/api/devices', authenticateToken, async (req, res) => {
   try {
-    const { customerId, customer_id, ip, mac, type, name, location, system, notes } = req.body;
+    const { customerId, customer_id, ip, mac, type, location, system, notes } = req.body;
     
-    // Validate required fields
-    if (!ip || !mac || !type || !customerId) {
+    if (!ip || !mac || !type || !(customerId || customer_id)) {
       return res.status(400).json({ message: 'Missing required fields' });
     }
 
@@ -288,7 +270,6 @@ app.post('/api/devices', authenticateToken, async (req, res) => {
       ip,
       mac,
       type,
-      name: name || `Device ${ip}`,
       location: location || null,
       system: system || 'Other',
       notes: notes || null
@@ -418,20 +399,30 @@ app.delete('/api/passwords/:id', authenticateToken, async (req, res) => {
 // Initialize database and start server
 const PORT = process.env.PORT || 3002;
 
-sequelize.sync({ force: true }).then(() => {
-  // Create default admin user if it doesn't exist
-  User.findOrCreate({
-    where: { username: 'admin' },
-    defaults: {
-      password_hash: bcrypt.hashSync('admin', 10),
-      is_admin: true
-    }
-  }).then(() => {
+const startServer = async () => {
+  try {
+    // Sync database and create default admin user
+    await sequelize.sync({ force: true });
+    console.log('Database synchronized');
+
+    await User.findOrCreate({
+      where: { username: 'admin' },
+      defaults: {
+        password_hash: bcrypt.hashSync('admin', 10),
+        is_admin: true
+      }
+    });
+    console.log('Default admin user created');
+
+    // Start the server
     app.listen(PORT, () => {
       console.log(`Server is running on port ${PORT}`);
     });
-  });
-});
+  } catch (error) {
+    console.error('Failed to start server:', error);
+    process.exit(1);
+  }
+};
 
 // Handle process termination
 process.on('SIGTERM', () => {
@@ -453,5 +444,7 @@ process.on('uncaughtException', (err) => {
 // Handle unhandled promise rejections
 process.on('unhandledRejection', (err) => {
   console.error('Unhandled Rejection:', err);
-  process.exit(1);
-}); 
+});
+
+// Start the server
+startServer(); 
