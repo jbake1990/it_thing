@@ -290,7 +290,7 @@ app.post('/api/devices', authenticateToken, async (req, res) => {
       type,
       name: name || `Device ${ip}`,
       location: location || null,
-      system: system || 'Networking',
+      system: system || 'Other',
       notes: notes || null
     });
 
@@ -418,7 +418,7 @@ app.delete('/api/passwords/:id', authenticateToken, async (req, res) => {
 // Initialize database and start server
 const PORT = process.env.PORT || 3002;
 
-sequelize.sync().then(() => {
+sequelize.sync({ force: true }).then(() => {
   // Create default admin user if it doesn't exist
   User.findOrCreate({
     where: { username: 'admin' },

@@ -259,6 +259,7 @@ ipcMain.handle("save-device", async (event, { ip, mac, type, customerId }) => {
             type,
             customerId,
             name: `Device ${ip}`,
+            system: "Other",
             notes: "Added from network scan"
         }, {
             headers: {
